@@ -2,15 +2,20 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Console extends Model
 {
-    protected $guarded = [];
+    use HasFactory;
 
-    // Relasi: 1 Console punya banyak sesi rental
-    public function rentalSessions()
+    protected $guarded = ['id'];
+
+    /**
+     * Relasi One-to-Many: 1 Console memiliki banyak RentalSession
+     */
+    public function sessions()
     {
-        return $table = $this->hasMany(RentalSession::class);
+        return $this->hasMany(RentalSession::class);
     }
 }
