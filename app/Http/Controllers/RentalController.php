@@ -68,13 +68,18 @@ class RentalController extends Controller
 
         // --- Logika Perhitungan Biaya Rental ---
         if ($session->type === 'package' && $session->package) {
-            // Jika memilih Paket, biaya awal sesuai harga flat paket
+            // 1. Biaya awal paket
             $rentalCost = $session->package->price;
             
-            // Opsional: Jika waktu penggunaan melebihi durasi paket (overtime),
-            // kelebihannya dihitung per 15 menit menggunakan tarif reguler console
-            if ($totalMinutes > $session->package->duration_minutes) {
-                $extraMinutes = $totalMinutes - $session->package->duration_minutes;
+            // 2. Tambahkan biaya dari perpanjangan paket (jika ada)
+            $rentalCost += $session->extended_cost;
+
+            // 3. Total batas durasi resmi (Durasi Paket Awal + Perpanjangan)
+            $allowedDuration = $session->package->duration_minutes + $session->extended_minutes;
+
+            // 4. Cek overtime jika waktu main riil melebihi batas durasi resmi
+            if ($totalMinutes > $allowedDuration) {
+                $extraMinutes = $totalMinutes - $allowedDuration;
                 $extraBlocks = floor($extraMinutes / 15);
                 $ratePerBlock = $session->console->hourly_rate / 4;
                 $rentalCost += ($extraBlocks * $ratePerBlock);
@@ -92,16 +97,17 @@ class RentalController extends Controller
 
         $session->update([
             'end_time' => $endTime,
-            'total_minutes' => $totalMinutes,
             'rental_cost' => $rentalCost,
             'fnb_cost' => $fnbCost,
             'total_cost' => $totalCost,
             'status' => 'completed',
         ]);
 
-        return redirect()->back()->with('success', "Sesi dikembalikan! Total Tagihan: Rp " . number_format($totalCost, 0, ',', '.'));
-
-        
+        // Kembalikan ke dashboard dengan membawa ID sesi yang baru di-stop
+        return redirect()->back()->with([
+            'success' => 'Sesi rental berhasil diselesaikan!',
+            'show_receipt_id' => $session->id
+        ]);
     }
     public function addOrder(Request $request, $sessionId)
     {
@@ -122,5 +128,36 @@ class RentalController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Pesanan FnB berhasil ditambahkan!');
+    }
+    public function printReceipt($id)
+    {
+        // Ambil data sesi rental beserta relasi console, paket, dan orders FnB
+        $session = RentalSession::with(['console', 'package', 'orders.product'])->findOrFail($id);
+
+        return view('rental.receipt', compact('session'));
+    }
+    public function extendSession(Request $request, $sessionId)
+    {
+        $request->validate([
+            'package_id' => 'required|exists:packages,id',
+        ]);
+
+        $session = RentalSession::where('status', 'active')->findOrFail($sessionId);
+        $package = Package::findOrFail($request->package_id);
+
+        // Update durasi, biaya, dan nama paket perpanjangan
+        $session->increment('extended_minutes', $package->duration_minutes);
+        $session->increment('extended_cost', $package->price);
+        
+        // Simpan/gabungkan nama paket perpanjangan
+        $currentExtendedName = $session->extended_package_name 
+            ? $session->extended_package_name . ', ' . $package->name 
+            : $package->name;
+
+        $session->update([
+            'extended_package_name' => $currentExtendedName
+        ]);
+
+        return redirect()->back()->with('success', 'Paket berhasil diperpanjang!');
     }
 }

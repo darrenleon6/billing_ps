@@ -91,8 +91,9 @@
                                 <div class="bg-gray-900 text-green-400 p-2.5 rounded-lg text-center font-mono border border-gray-700">
                                     <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Durasi Berjalan</p>
                                     <div class="text-2xl font-bold tracking-wider text-green-400 timer-display"
-                                         data-start="{{ \Carbon\Carbon::parse($activeSession->start_time)->toIso8601String() }}"
-                                         data-duration="{{ $activeSession->type === 'package' && $activeSession->package ? $activeSession->package->duration_minutes : '' }}">
+                                        data-start="{{ \Carbon\Carbon::parse($activeSession->start_time)->toIso8601String() }}"
+                                        data-duration="{{ $activeSession->type === 'package' && $activeSession->package ? $activeSession->package->duration_minutes : '' }}"
+                                        data-extended="{{ $activeSession->extended_minutes ?? 0 }}">
                                         00:00:00
                                     </div>
                                     <p class="text-[10px] text-gray-400 mt-1 extra-info"></p>
@@ -115,6 +116,27 @@
                                     </ul>
                                 @endif
                             </div>
+
+                            {{-- FORM TAMBAH DURASI / PAKET (KHUSUS MODE PAKET) --}}
+                            @if($activeSession->type === 'package')
+                            <form action="{{ route('rental.extend', $activeSession->id) }}" method="POST" class="border-t pt-2 space-y-1">
+                                @csrf
+                                <label class="block text-xs font-bold text-gray-700">Perpanjang Paket:</label>
+                                <div class="flex gap-1.5">
+                                    <select name="package_id" class="text-xs border rounded p-1 flex-1 bg-white" required>
+                                        <option value="">-- Pilih Tambah Paket --</option>
+                                        @foreach($packages as $pkg)
+                                            <option value="{{ $pkg->id }}">
+                                                + {{ $pkg->name }} ({{ $pkg->duration_minutes }} mnt) - Rp {{ number_format($pkg->price, 0, ',', '.') }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white text-xs px-2.5 py-1 rounded font-bold transition">
+                                        + Tambah
+                                    </button>
+                                </div>
+                            </form>
+                            @endif
 
                             {{-- FORM TAMBAH FNB --}}
                             <form action="{{ route('rental.order', $activeSession->id) }}" method="POST" class="border-t pt-2 flex gap-1.5">
@@ -167,7 +189,11 @@
 
         timers.forEach(timer => {
             const startTime = new Date(timer.dataset.start).getTime();
-            const durationMinutes = timer.dataset.duration ? parseInt(timer.dataset.duration) : null;
+            // Ambil durasi paket dasar
+            const baseDuration = timer.dataset.duration ? parseInt(timer.dataset.duration) : null;
+            // Ambil durasi perpanjangan (extended_minutes)
+            const extendedDuration = timer.dataset.extended ? parseInt(timer.dataset.extended) : 0;
+            
             const now = new Date().getTime();
 
             const elapsedSeconds = Math.floor((now - startTime) / 1000);
@@ -178,8 +204,10 @@
             // ==========================================
             // KONDISI 1: MODE PAKET (COUNTDOWN MUNDUR)
             // ==========================================
-            if (durationMinutes) {
-                const totalPackageSeconds = durationMinutes * 60;
+            if (baseDuration !== null) {
+                // TOTAL WAKTU PAKET = WAKTU AWAL + WAKTU PERPANJANGAN
+                const totalPackageMinutes = baseDuration + extendedDuration;
+                const totalPackageSeconds = totalPackageMinutes * 60;
                 const remainingSeconds = totalPackageSeconds - elapsedSeconds;
 
                 if (remainingSeconds >= 0) {
@@ -192,11 +220,11 @@
                     timer.className = 'text-2xl font-bold tracking-wider text-green-400 timer-display';
 
                     if (extraInfo) {
-                        extraInfo.textContent = '⏳ Sisa Waktu Paket';
+                        extraInfo.textContent = extendedDuration > 0 ? `⏳ Sisa Waktu (+${extendedDuration} mnt)` : '⏳ Sisa Waktu Paket';
                         extraInfo.className = 'text-[10px] text-green-300 mt-1 extra-info';
                     }
                 } else {
-                    // Waktu Paket Habis -> Tampilkan Overtime (Hitung Maju Kelebihan Waktu)
+                    // Waktu Paket Habis -> Overtime
                     const overSeconds = Math.abs(remainingSeconds);
                     const hours = String(Math.floor(overSeconds / 3600)).padStart(2, '0');
                     const minutes = String(Math.floor((overSeconds % 3600) / 60)).padStart(2, '0');
@@ -233,6 +261,134 @@
     setInterval(updateTimers, 1000);
     updateTimers();
 </script>
+<!-- Modal Pop-Up Struk (Tailwind CSS) -->
+@if(session('show_receipt_id'))
+    @php
+        $receiptSession = \App\Models\RentalSession::with(['console', 'package', 'orders.product'])->find(session('show_receipt_id'));
+    @endphp
 
+    @if($receiptSession)
+    <!-- Overlay Background Dark -->
+    <div id="receiptModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
+        
+        <!-- Card Pop-Up Modal -->
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden font-mono text-sm text-gray-800">
+            
+            <!-- Header Modal -->
+            <div class="bg-gray-900 text-white px-4 py-3 flex justify-between items-center">
+                <h3 class="font-bold text-base">Rincian Pembayaran</h3>
+                <button type="button" onclick="closeReceiptModal()" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- Body Struk (Print Area) -->
+            <div class="p-4 bg-white" id="printableReceipt">
+                <div class="text-center mb-3">
+                    <h2 class="font-bold text-lg uppercase">RENTAL PS KITA</h2>
+                    <p class="text-xs text-gray-500">Jl. Contoh No. 123, Kota</p>
+                </div>
+                
+                <div class="border-b border-dashed border-gray-400 my-2"></div>
+
+                <div class="text-xs space-y-1">
+                    <div><span class="inline-block w-20">No. Nota</span>: #{{ $receiptSession->id }}</div>
+                    <div><span class="inline-block w-20">Mulai</span>: {{ \Carbon\Carbon::parse($receiptSession->start_time)->format('d/m/Y H:i') }}</div>
+                    <div><span class="inline-block w-20">Selesai</span>: {{ \Carbon\Carbon::parse($receiptSession->end_time)->format('d/m/Y H:i') }}</div>
+                    <div><span class="inline-block w-20">Console</span>: {{ $receiptSession->console->name }}</div>
+                </div>
+
+                <div class="border-b border-dashed border-gray-400 my-2"></div>
+
+                <!-- Rincian Item -->
+                <table class="w-full text-xs">
+                    <tr>
+                        <td colspan="2" class="font-semibold">Sewa {{ $receiptSession->console->name }}</td>
+                    </tr>
+
+                    {{-- 1. Paket Utama / Open Play --}}
+                    <tr>
+                        <td>
+                            @if($receiptSession->type == 'package')
+                                {{ $receiptSession->package->name ?? 'Paket' }} ({{ $receiptSession->package->duration_minutes ?? 0 }} mnt)
+                            @else
+                                Open Play
+                            @endif
+                        </td>
+                        <td class="text-right">
+                            Rp {{ number_format($receiptSession->type == 'package' ? ($receiptSession->package->price ?? 0) : $receiptSession->rental_cost, 0, ',', '.') }}
+                        </td>
+                    </tr>
+
+                    {{-- 2. Paket Perpanjangan (Jika Ada) --}}
+                    @if($receiptSession->extended_minutes > 0)
+                    <tr>
+                        <td class="pl-2 italic text-gray-600">
+                            + Ext: {{ $receiptSession->extended_package_name ?? 'Tambahan Paket' }} ({{ $receiptSession->extended_minutes }} mnt)
+                        </td>
+                        <td class="text-right italic text-gray-600">
+                            Rp {{ number_format($receiptSession->extended_cost, 0, ',', '.') }}
+                        </td>
+                    </tr>
+                    @endif
+
+                    {{-- 3. Rincian Order FnB --}}
+                    @if($receiptSession->orders && $receiptSession->orders->count() > 0)
+                        @foreach($receiptSession->orders as $order)
+                        <tr>
+                            <td colspan="2" class="pt-2 font-semibold">{{ $order->product->name }}</td>
+                        </tr>
+                        <tr>
+                            <td>{{ $order->quantity }} x {{ number_format($order->price, 0, ',', '.') }}</td>
+                            <td class="text-right">Rp {{ number_format($order->subtotal, 0, ',', '.') }}</td>
+                        </tr>
+                        @endforeach
+                    @endif
+                </table>
+
+                <div class="border-b border-dashed border-gray-400 my-2"></div>
+
+                <!-- Total -->
+                <table class="w-full text-xs">
+                    <tr>
+                        <td>Biaya Rental</td>
+                        <td class="text-right">Rp {{ number_format($receiptSession->rental_cost, 0, ',', '.') }}</td>
+                    </tr>
+                    @if($receiptSession->fnb_cost > 0)
+                    <tr>
+                        <td>Total FnB</td>
+                        <td class="text-right">Rp {{ number_format($receiptSession->fnb_cost, 0, ',', '.') }}</td>
+                    </tr>
+                    @endif
+                    <tr class="font-bold text-sm pt-1">
+                        <td>TOTAL BIAYA</td>
+                        <td class="text-right">Rp {{ number_format($receiptSession->total_cost, 0, ',', '.') }}</td>
+                    </tr>
+                </table>
+
+                <div class="border-b border-dashed border-gray-400 my-2"></div>
+
+                <div class="text-center text-xs text-gray-500 mt-2">
+                    <p>-- Terima Kasih --</p>
+                </div>
+            </div>
+
+            <!-- Footer Buttons -->
+            <div class="bg-gray-100 px-4 py-3 flex justify-between gap-2 border-t border-gray-200">
+                <button type="button" onclick="closeReceiptModal()" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded text-xs font-semibold">
+                    Tutup (Tanpa Cetak)
+                </button>
+                <button type="button" onclick="window.print()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">
+                    Cetak Struk
+                </button>
+            </div>
+
+        </div>
+    </div>
+    <script>
+        function closeReceiptModal() {
+            document.getElementById('receiptModal').remove();
+        }
+    </script>
+    @endif
+@endif
 </body>
 </html>
