@@ -8,6 +8,8 @@
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
 
+@include('layouts.navigation')
+
     <div class="container mx-auto p-6">
         <h1 class="text-3xl font-bold mb-6 text-indigo-700">🎮 Dashboard Billing Rental PS</h1>
 
@@ -141,11 +143,12 @@
                             {{-- FORM TAMBAH FNB --}}
                             <form action="{{ route('rental.order', $activeSession->id) }}" method="POST" class="border-t pt-2 flex gap-1.5">
                                 @csrf
-                                <select name="product_id" class="text-xs border rounded p-1 flex-1" required>
-                                    <option value="">+ Tambah FnB</option>
+                                <select name="product_id" class="text-xs border rounded p-1 flex-1 bg-white" required>
+                                    <option value="">-- Pilih FnB --</option>
                                     @foreach($products as $product)
-                                        <option value="{{ $product->id }}">
-                                            {{ $product->name }} (Rp {{ number_format($product->price, 0, ',', '.') }})
+                                        <option value="{{ $product->id }}" {{ $product->stock <= 0 ? 'disabled' : '' }}>
+                                            {{ $product->name }} (Stok: {{ $product->stock }}) - Rp {{ number_format($product->price, 0, ',', '.') }}
+                                            {{ $product->stock <= 0 ? ' [HABIS]' : '' }}
                                         </option>
                                     @endforeach
                                 </select>

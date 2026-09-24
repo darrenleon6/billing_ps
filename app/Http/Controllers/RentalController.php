@@ -117,15 +117,25 @@ class RentalController extends Controller
         ]);
 
         $product = Product::findOrFail($request->product_id);
+
+        // 1. Cek ketersediaan stok
+        if ($product->stock < $request->quantity) {
+            return redirect()->back()->with('error', "Stok {$product->name} tidak mencukupi! Tersisa: {$product->stock}");
+        }
+
+        // 2. Buat order
         $subtotal = $product->price * $request->quantity;
 
         Order::create([
             'rental_session_id' => $sessionId,
-            'product_id'        => $request->product_id,
+            'product_id'        => $product->id,
             'quantity'          => $request->quantity,
             'price'             => $product->price,
             'subtotal'          => $subtotal,
         ]);
+
+        // 3. Potong stok otomatis
+        $product->decrement('stock', $request->quantity);
 
         return redirect()->back()->with('success', 'Pesanan FnB berhasil ditambahkan!');
     }
