@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Console extends Model
 {
@@ -15,6 +16,11 @@ class Console extends Model
      * Relasi One-to-Many: 1 Console memiliki banyak RentalSession
      */
     public function sessions()
+    {
+        return $this->hasMany(RentalSession::class);
+    }
+
+    public function rentalSessions(): HasMany
     {
         return $this->hasMany(RentalSession::class);
     }

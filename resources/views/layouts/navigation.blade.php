@@ -18,17 +18,32 @@
                     Dashboard Rental
                 </a>
                 
-                {{-- Link Stok & Produk --}}
-                <a href="{{ route('products.index') }}" 
-                   class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('products.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                    Stok & Produk
-                </a>
+               {{-- Menu Khusus Admin Saja --}}
+                @if(auth()->user()->isAdmin())
+                    <a href="{{ route('products.index') }}" 
+                    class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('products.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        Stok & Produk
+                    </a>
 
-                {{-- Link Laporan Transaksi --}}
-                <a href="{{ route('reports.transactions') }}" 
-                   class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('reports.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                    Laporan Transaksi
-                </a>
+                    <a href="{{ route('reports.transactions') }}" 
+                    class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('reports.transactions') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        Laporan Transaksi
+                    </a>
+
+                    <a href="{{ route('reports.analytics') }}" 
+                    class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('reports.analytics') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        Statistik
+                    </a>
+                @endif
+
+                {{-- Tombol Logout --}}
+                <form method="POST" action="{{ route('logout') }}" class="inline">
+                    @csrf
+                    <button type="submit" 
+                            class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium text-red-400 hover:bg-gray-800 hover:text-red-300 transition-colors">
+                        Logout
+                    </button>
+                </form>
             </div>
 
         </div>

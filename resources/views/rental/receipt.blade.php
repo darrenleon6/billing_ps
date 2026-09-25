@@ -1,5 +1,5 @@
 {{-- SECTION RINCIAN BIAYA RENTAL DI STRUK --}}
-<div class="border-b border-dashed pb-2 mb-2 text-xs">
+<div class="border-b border-dashed pb-2 mb-2 text-xs space-y-1">
     <p class="font-bold mb-1">Rincian Sewa:</p>
     
     @if($sessionReceipt->type === 'package' && $sessionReceipt->package)
@@ -23,4 +23,16 @@
             <span>Rp {{ number_format($sessionReceipt->rental_cost, 0, ',', '.') }}</span>
         </div>
     @endif
+
+    {{-- Metode Pembayaran (Menggunakan $sessionReceipt) --}}
+    <div class="flex justify-between pt-1 border-t border-dashed">
+        <span>Metode Bayar:</span>
+        <span class="font-bold uppercase">
+            @if(($sessionReceipt->payment_method ?? 'cash') === 'qris')
+                QRIS / Transfer
+            @else
+                Cash / Tunai
+            @endif
+        </span>
+    </div>
 </div>

@@ -22,11 +22,21 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
-    protected function casts(): array
+    protected $fillable = [
+        'name',
+        'username',
+        'role',
+        'password',
+    ];
+
+    // Helper method untuk cek role
+    public function isAdmin(): bool
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->role === 'admin';
+    }
+
+    public function isOperator(): bool
+    {
+        return $this->role === 'operator';
     }
 }

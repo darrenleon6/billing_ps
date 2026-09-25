@@ -158,13 +158,22 @@
                                 </button>
                             </form>
 
-                            {{-- TOMBOL STOP --}}
-                            <form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="pt-1">
-                                @csrf
-                                <button type="submit" onclick="return confirm('Selesaikan sesi {{ $console->name }}?')" class="w-full bg-red-600 hover:bg-red-700 text-white text-xs py-2 rounded font-bold transition">
-                                    🛑 Stop & Hitung Tagihan
-                                </button>
-                            </form>
+                            {{-- FORM STOP RENTAL --}}
+                            <form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="space-y-2">
+                            @csrf
+                           <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Metode Pembayaran:</label>
+                                <select name="payment_method" required class="w-full text-xs border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 py-1.5">
+                                    <option value="cash">Tunai (Cash)</option>
+                                    <option value="qris">QRIS / Transfer</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" onclick="return confirm('Selesaikan sesi rental ini?')" 
+                                    class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-semibold transition text-sm shadow">
+                                Stop & Cetak Struk
+                            </button>
+                        </form>
                         @endif
                     </div>
 
@@ -365,6 +374,19 @@
                         <td>TOTAL BIAYA</td>
                         <td class="text-right">Rp {{ number_format($receiptSession->total_cost, 0, ',', '.') }}</td>
                     </tr>
+                    {{-- TAMBAHKAN BARIS METODE PEMBAYARAN DI SINI --}}
+                <tr class="border-t border-dashed border-gray-400">
+                    <td class="pt-1">Metode Bayar</td>
+                    <td class="text-right pt-1 font-bold uppercase">
+                        @if(($receiptSession->payment_method ?? 'cash') === 'qris')
+                            QRIS / Transfer
+                        @elseif(($receiptSession->payment_method ?? 'cash') === 'debit')
+                            Kartu Debit
+                        @else
+                            Cash / Tunai
+                        @endif
+                    </td>
+                </tr>
                 </table>
 
                 <div class="border-b border-dashed border-gray-400 my-2"></div>

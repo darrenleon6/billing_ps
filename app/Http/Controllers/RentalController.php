@@ -12,21 +12,27 @@ use Carbon\Carbon;
 
 class RentalController extends Controller
 {
-    public function index()
-    {
-        // 1. Ambil semua console beserta sesi aktif (dan relasi paket & orders)
-        $consoles = Console::with(['sessions' => function ($query) {
-            $query->where('status', 'active')->with(['orders.product', 'package']);
-        }])->orderBy('id', 'asc')->get();
+  public function index()
+{
+    // 1. Ambil semua console beserta sesi aktif
+    $consoles = Console::with(['sessions' => function ($query) {
+        $query->where('status', 'active')->with(['orders.product', 'package']);
+    }])->orderBy('id', 'asc')->get();
 
-        // 2. Ambil produk FnB diurutkan A-Z
-        $products = Product::orderBy('name', 'asc')->get();
+    // 2. Ambil produk FnB & Paket
+    $products = Product::orderBy('name', 'asc')->get();
+    $packages = Package::all();
 
-        // 3. Ambil daftar paket diurutkan berdasarkan durasi terpendek ke terpanjang
-        $packages = Package::orderBy('duration_minutes', 'asc')->get();
-
-        return view('dashboard', compact('consoles', 'products', 'packages'));
+    // 🟢 3. TAMBAHKAN BAGIAN INI (Cek apakah ada request cetak/tampil struk)
+    $receiptSession = null;
+    if (session('show_receipt_id')) {
+        $receiptSession = RentalSession::with(['console', 'package', 'orders.product'])
+            ->find(session('show_receipt_id'));
     }
+
+    // 🟢 4. Masukkan 'receiptSession' ke dalam compact()
+    return view('dashboard', compact('consoles', 'products', 'packages', 'receiptSession'));
+}
 
     public function startSession(Request $request)
     {
@@ -56,8 +62,15 @@ class RentalController extends Controller
         return redirect()->back()->with('success', 'Sesi rental berhasil dimulai!');
     }
 
-    public function stopSession($id)
+
+
+    public function stopSession(Request $request, $id) // <-- Tambahkan parameter Request $request
     {
+        // 1. Validasi input metode pembayaran dari form
+        $request->validate([
+            'payment_method' => ['required', 'string', 'in:cash,qris'],
+        ]);
+
         $session = RentalSession::with(['console', 'package', 'orders'])->findOrFail($id);
 
         $endTime = Carbon::now();
@@ -95,11 +108,13 @@ class RentalController extends Controller
         $fnbCost = $session->orders->sum('subtotal');
         $totalCost = $rentalCost + $fnbCost;
 
+        // --- Simpan Perubahan Termasuk Payment Method ---
         $session->update([
             'end_time' => $endTime,
             'rental_cost' => $rentalCost,
             'fnb_cost' => $fnbCost,
             'total_cost' => $totalCost,
+            'payment_method' => $request->payment_method, // <-- SIMPAN DI SINI
             'status' => 'completed',
         ]);
 

@@ -19,6 +19,7 @@ return new class extends Migration
             $table->timestamp('end_time')->nullable();
             $table->string('status')->default('active'); // active / completed
             $table->decimal('fnb_cost', 12, 2)->default(0);
+            $table->string('payment_method')->default('cash'); // <-- Tambahkan baris ini
             $table->decimal('rental_cost', 12, 2)->default(0);
             $table->decimal('total_cost', 12, 2)->default(0);
             $table->timestamps();
