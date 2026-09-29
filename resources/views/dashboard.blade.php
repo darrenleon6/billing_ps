@@ -29,13 +29,14 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             @foreach($consoles as $console)
                 @php
-                    $activeSession =$console->sessions->first();
+                    $activeSession = $console->sessions->first();
                 @endphp
 
-                <div class="bg-white rounded-xl shadow-md overflow-hidden border-2 {{ $activeSession ? 'border-red-400 bg-red-50/20' : 'border-green-400 bg-green-50/20' }}">
+                {{-- 🟢 Mengunci tinggi kartu kaku (h-[520px]) dan flex-col agar seragam --}}
+                <div class="bg-white rounded-xl shadow-md overflow-hidden border-2 flex flex-col h-[520px] {{ $activeSession ? 'border-red-400 bg-red-50/10' : 'border-green-400 bg-green-50/10' }}">
                     
                     {{-- HEADER KARTU CONSOLE --}}
-                    <div class="p-4 border-b flex justify-between items-center {{ $activeSession ? 'bg-red-500 text-white' : 'bg-green-600 text-white' }}">
+                    <div class="p-4 flex-none flex justify-between items-center {{ $activeSession ? 'bg-red-500 text-white' : 'bg-green-600 text-white' }}">
                         <div>
                             <h2 class="font-bold text-lg leading-tight">{{ $console->name }}</h2>
                             <p class="text-xs opacity-90">Rp {{ number_format($console->hourly_rate, 0, ',', '.') }}/jam</p>
@@ -45,161 +46,173 @@
                         </span>
                     </div>
 
-                    <div class="p-4 space-y-4">
+                    {{-- BODY KARTU (Mengisi ruang sisa & mengatur tata letak internal) --}}
+                    <div class="p-4 flex-1 flex flex-col justify-between overflow-hidden">
                         @if(!$activeSession)
                             {{-- FORM MULAI RENTAL --}}
-                            <form action="{{ route('rental.start') }}" method="POST" class="space-y-3">
+                            <form action="{{ route('rental.start') }}" method="POST" class="flex-1 flex flex-col justify-between">
                                 @csrf
                                 <input type="hidden" name="console_id" value="{{ $console->id }}">
 
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-600 mb-1">Mode Main</label>
-                                    <select name="type" id="type_select_{{ $console->id }}" 
-                                            onchange="togglePackageDropdown('{{ $console->id }}')" 
-                                            class="w-full text-sm border rounded p-2 focus:ring focus:ring-indigo-200" required>
-                                        <option value="open">⏱️ Open Play (Per 15 Menit)</option>
-                                        <option value="package">📦 Mode Paket</option>
-                                    </select>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-600 mb-1">Mode Main</label>
+                                        <select name="type" id="type_select_{{ $console->id }}" 
+                                                onchange="togglePackageDropdown('{{ $console->id }}')" 
+                                                class="w-full text-sm border rounded-lg p-2 focus:ring focus:ring-indigo-200" required>
+                                            <option value="open">⏱️ Open Play (Per 15 Menit)</option>
+                                            <option value="package">📦 Mode Paket</option>
+                                        </select>
+                                    </div>
+
+                                    {{-- Dropdown Paket --}}
+                                    <div id="package_container_{{ $console->id }}" class="hidden">
+                                        <label class="block text-xs font-semibold text-gray-600 mb-1">Pilih Paket</label>
+                                        <select name="package_id" class="w-full text-sm border rounded-lg p-2 focus:ring focus:ring-indigo-200">
+                                            @foreach($packages as $package)
+                                                <option value="{{ $package->id }}">
+                                                    {{ $package->name }} ({{ $package->duration_minutes }} mnt) - Rp {{ number_format($package->price, 0, ',', '.') }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
                                 </div>
 
-                                {{-- Dropdown Paket --}}
-                                <div id="package_container_{{ $console->id }}" class="hidden">
-                                    <label class="block text-xs font-semibold text-gray-600 mb-1">Pilih Paket</label>
-                                    <select name="package_id" class="w-full text-sm border rounded p-2 focus:ring focus:ring-indigo-200">
-                                        @foreach($packages as $package)
-                                            <option value="{{ $package->id }}">
-                                                {{ $package->name }} ({{ $package->duration_minutes }} mnt) - Rp {{ number_format($package->price, 0, ',', '.') }}
-                                            </option>
-                                        @endforeach
-                                    </select>
+                                {{-- 🟢 EMOJI PLACEHOLDER (Mengisi sisa ruang secara fleksibel & terpusat secara vertikal) --}}
+                                <div class="flex-1 my-2 flex flex-col items-center justify-center py-4 text-center border-2 border-dashed border-green-200/80 rounded-xl bg-green-50/30">
+                                    <div class="text-4xl mb-1.5 transition-transform hover:scale-110 duration-200">
+                                        🎮
+                                    </div>
+                                    <span class="text-xs font-bold text-green-700 tracking-wide uppercase">Unit Ready to Play</span>
+                                    <p class="text-[10px] text-gray-400 mt-0.5">Pilih mode main lalu klik Mulai Rental</p>
                                 </div>
 
-                                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 rounded transition">
+                                {{-- Tombol Mulai (Otomatis Terdorong ke Bawah) --}}
+                                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2.5 rounded-lg transition mt-auto shadow">
                                     ▶️ Mulai Rental
                                 </button>
                             </form>
 
                         @else
                             {{-- RINCIAN CONSOLE AKTIF & TIMER --}}
-                            <div class="text-sm space-y-2">
-                                <div class="flex justify-between text-xs text-gray-600 border-b pb-1">
-                                    <span>Mulai: <strong class="text-gray-800">{{ \Carbon\Carbon::parse($activeSession->start_time)->timezone('Asia/Jakarta')->format('H:i:s') }}</strong></span>
-                                    <span class="font-bold text-indigo-700 uppercase">
-                                        {{ $activeSession->type === 'package' ? ($activeSession->package->name ?? 'Paket') : 'Open Play' }}
-                                    </span>
-                                </div>
-
-                                {{-- DISPLAY TIMER REAL-TIME --}}
-                                <div class="bg-gray-900 text-green-400 p-2.5 rounded-lg text-center font-mono border border-gray-700">
-                                    <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Durasi Berjalan</p>
-                                    <div class="text-2xl font-bold tracking-wider text-green-400 timer-display"
-                                        data-start="{{ \Carbon\Carbon::parse($activeSession->start_time)->toIso8601String() }}"
-                                        data-duration="{{ $activeSession->type === 'package' && $activeSession->package ? $activeSession->package->duration_minutes : '' }}"
-                                        data-extended="{{ $activeSession->extended_minutes ?? 0 }}">
-                                        00:00:00
+                            <div class="flex-1 flex flex-col justify-between overflow-y-auto pr-0.5 space-y-3">
+                                <div class="text-sm space-y-2 flex-none">
+                                    <div class="flex justify-between text-xs text-gray-600 border-b pb-1">
+                                        <span>Mulai: <strong class="text-gray-800">{{ \Carbon\Carbon::parse($activeSession->start_time)->timezone('Asia/Jakarta')->format('H:i:s') }}</strong></span>
+                                        <span class="font-bold text-indigo-700 uppercase">
+                                            {{ $activeSession->type === 'package' ? ($activeSession->package->name ?? 'Paket') : 'Open Play' }}
+                                        </span>
                                     </div>
-                                    <p class="text-[10px] text-gray-400 mt-1 extra-info"></p>
+
+                                    {{-- DISPLAY TIMER REAL-TIME --}}
+                                    <div class="bg-gray-900 text-green-400 p-2.5 rounded-lg text-center font-mono border border-gray-700">
+                                        <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Durasi Berjalan</p>
+                                        <div class="text-2xl font-bold tracking-wider text-green-400 timer-display"
+                                            data-start="{{ \Carbon\Carbon::parse($activeSession->start_time)->toIso8601String() }}"
+                                            data-duration="{{ $activeSession->type === 'package' && $activeSession->package ? $activeSession->package->duration_minutes : '' }}"
+                                            data-extended="{{ $activeSession->extended_minutes ?? 0 }}">
+                                            00:00:00
+                                        </div>
+                                        <p class="text-[10px] text-gray-400 mt-1 extra-info"></p>
+                                    </div>
+                                </div>
+
+                                {{-- DAFTAR ORDER FNB --}}
+                                <div class="flex-1 min-h-[90px]">
+                                    <span class="text-xs font-semibold text-gray-500">Pesanan FnB:</span>
+                                    @if($activeSession->orders && $activeSession->orders->count() > 0)
+                                        {{-- 🟢 Diberikan max-h-[85px] & scrollbar agar tidak merusak tinggi kartu --}}
+                                        <ul class="mt-1 space-y-1 max-h-[85px] overflow-y-auto pr-1">
+                                            @foreach($activeSession->orders as $order)
+                                                <li class="flex justify-between items-center text-xs bg-white p-1.5 rounded border border-gray-200 shadow-2xs">
+                                                    <div class="truncate max-w-[130px]">
+                                                        <span class="font-medium text-gray-800">{{ $order->product->name }}</span>
+                                                        <span class="text-gray-500 font-bold">({{ $order->quantity }}x)</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-1.5 flex-none">
+                                                        <span class="font-semibold text-gray-700">Rp {{ number_format($order->subtotal, 0, ',', '.') }}</span>
+                                                        
+                                                        <form action="{{ route('rental.order.delete', $order->id) }}" method="POST" onsubmit="return confirm('Yakin ingin membatalkan pesanan {{ $order->product->name }}?')">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="text-red-500 hover:text-red-700 font-bold text-sm px-0.5" title="Batal/Hapus Pesanan">
+                                                                &times;
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <p class="text-xs text-gray-400 italic mt-1">Belum ada pesanan</p>
+                                    @endif
+                                </div>
+
+                                {{-- AREA AKSI BOTTOM (FORM PERPANJANG, TAMBAH FNB & STOP) --}}
+                                <div class="flex-none pt-2 border-t space-y-2 mt-auto">
+                                    {{-- FORM TAMBAH DURASI / PAKET --}}
+                                    @if($activeSession->type === 'package')
+                                    <form action="{{ route('rental.extend', $activeSession->id) }}" method="POST">
+                                        @csrf
+                                        <div class="flex items-center gap-1.5">
+                                            <select name="package_id" class="text-xs border border-gray-300 rounded-lg p-1 flex-1 bg-white min-w-0" required>
+                                                <option value="">-- Tambah Paket --</option>
+                                                @foreach($packages as $pkg)
+                                                    <option value="{{ $pkg->id }}">
+                                                        + {{ $pkg->name }} ({{ $pkg->duration_minutes }}m) - Rp {{ number_format($pkg->price, 0, ',', '.') }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            
+                                            <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-2 py-1 rounded-lg shadow-2xs whitespace-nowrap transition flex-shrink-0">
+                                                + Tambah
+                                            </button>
+                                        </div>
+                                    </form>
+                                    @endif
+
+                                    {{-- FORM TAMBAH FNB --}}
+                                    <form action="{{ route('rental.order', $activeSession->id) }}" method="POST" class="flex gap-1.5">
+                                        @csrf
+                                        <select name="product_id" class="text-xs border border-gray-300 rounded-lg p-1 flex-1 bg-white min-w-0" required>
+                                            <option value="">-- Pilih FnB --</option>
+                                            @foreach($products as $product)
+                                                <option value="{{ $product->id }}" {{ $product->stock <= 0 ? 'disabled' : '' }}>
+                                                    {{ $product->name }} (Stok: {{ $product->stock }}) - Rp {{ number_format($product->price, 0, ',', '.') }}
+                                                    {{ $product->stock <= 0 ? ' [HABIS]' : '' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <input type="number" name="quantity" value="1" min="1" class="text-xs border border-gray-300 rounded-lg w-10 p-1 text-center" required>
+                                        <button type="submit" class="bg-blue-600 text-white text-xs px-2 py-1 rounded-lg hover:bg-blue-700 font-bold flex-none">
+                                            +
+                                        </button>
+                                    </form>
+
+                                    {{-- FORM STOP RENTAL --}}
+                                    <form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="space-y-1.5">
+                                        @csrf
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-[11px] font-medium text-gray-600 flex-none">Bayar:</label>
+                                            <select name="payment_method" required class="text-xs border border-gray-300 rounded-lg p-1 flex-1 bg-white min-w-0">
+                                                <option value="cash">Tunai (Cash)</option>
+                                                <option value="qris">QRIS / Transfer</option>
+                                            </select>
+                                        </div>
+
+                                        <button type="submit" onclick="return confirm('Selesaikan sesi rental ini?')" 
+                                                class="w-full bg-red-600 hover:bg-red-700 text-white py-1.5 rounded-lg font-semibold transition text-xs shadow-2xs">
+                                            Stop & Cetak Struk
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
-
-                            {{-- DAFTAR ORDER FNB --}}
-                            {{-- List Pesanan FnB yang sudah dipesan --}}
-                            <div class="mb-3">
-                                <span class="text-xs font-semibold text-gray-500">Pesanan FnB:</span>
-                                @if($activeSession->orders && $activeSession->orders->count() > 0)
-                                    <ul class="mt-1 space-y-1">
-                                        @foreach($activeSession->orders as $order)
-                                            <li class="flex justify-between items-center text-xs bg-gray-50 p-1.5 rounded border border-gray-200">
-                                                <div>
-                                                    <span class="font-medium">{{ $order->product->name }}</span>
-                                                    <span class="text-gray-500">({{ $order->quantity }}x)</span>
-                                                </div>
-                                                <div class="flex items-center gap-2">
-                                                    <span class="font-semibold text-gray-700">Rp {{ number_format($order->subtotal, 0, ',', '.') }}</span>
-                                                    
-                                                    {{-- 🟢 FORM TOMBOL HAPUS / BATAL ORDER --}}
-                                                    <form action="{{ route('rental.order.delete', $order->id) }}" method="POST" onsubmit="return confirm('Yakin ingin membatalkan pesanan {{ $order->product->name }}?')">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="text-red-500 hover:text-red-700 font-bold text-sm px-1" title="Batal/Hapus Pesanan">
-                                                            &times;
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                @else
-                                    <p class="text-xs text-gray-400 italic">Belum ada pesanan</p>
-                                @endif
-                            </div>
-
-                            {{-- FORM TAMBAH DURASI / PAKET (KHUSUS MODE PAKET) --}}
-                            @if($activeSession->type === 'package')
-                            <form action="{{ route('rental.extend', $activeSession->id) }}" method="POST" class="border-t border-gray-200 pt-2 mb-3">
-                                @csrf
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">Perpanjang Paket:</label>
-                                <div class="flex items-center gap-1.5">
-                                    {{-- Dropdown Select paket --}}
-                                    <select name="package_id" class="w-full text-xs border-gray-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 py-1.5 px-2 bg-white min-w-0" required>
-                                        <option value="">-- Pilih Tambah Paket --</option>
-                                        @foreach($packages as $pkg)
-                                            <option value="{{ $pkg->id }}">
-                                                + {{ $pkg->name }} ({{ $pkg->duration_minutes }} mnt) - Rp {{ number_format($pkg->price, 0, ',', '.') }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                    
-                                    {{-- Tombol + Tambah --}}
-                                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-2.5 py-1.5 rounded-lg shadow whitespace-nowrap transition flex-shrink-0">
-                                        + Tambah
-                                    </button>
-                                </div>
-                            </form>
-                            @endif
-
-                            {{-- FORM TAMBAH FNB --}}
-                            <form action="{{ route('rental.order', $activeSession->id) }}" method="POST" class="border-t pt-2 flex gap-1.5">
-                                @csrf
-                                <select name="product_id" class="text-xs border rounded p-1 flex-1 bg-white" required>
-                                    <option value="">-- Pilih FnB --</option>
-                                    @foreach($products as $product)
-                                        <option value="{{ $product->id }}" {{ $product->stock <= 0 ? 'disabled' : '' }}>
-                                            {{ $product->name }} (Stok: {{ $product->stock }}) - Rp {{ number_format($product->price, 0, ',', '.') }}
-                                            {{ $product->stock <= 0 ? ' [HABIS]' : '' }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <input type="number" name="quantity" value="1" min="1" class="text-xs border rounded w-10 p-1 text-center" required>
-                                <button type="submit" class="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700 font-bold">
-                                    +
-                                </button>
-                            </form>
-
-                            {{-- FORM STOP RENTAL --}}
-                            <form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="space-y-2">
-                            @csrf
-                           <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Metode Pembayaran:</label>
-                                <select name="payment_method" required class="w-full text-xs border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 py-1.5">
-                                    <option value="cash">Tunai (Cash)</option>
-                                    <option value="qris">QRIS / Transfer</option>
-                                </select>
-                            </div>
-
-                            <button type="submit" onclick="return confirm('Selesaikan sesi rental ini?')" 
-                                    class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-semibold transition text-sm shadow">
-                                Stop & Cetak Struk
-                            </button>
-                        </form>
                         @endif
                     </div>
 
                 </div>
             @endforeach
         </div>
-
-    </div>
 
     {{-- JAVASCRIPT UNTUK DROPDOWN & TIMER LIVE --}}
     <script>
