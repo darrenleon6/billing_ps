@@ -103,29 +103,45 @@
                             </div>
 
                             {{-- DAFTAR ORDER FNB --}}
-                            <div class="border-t pt-2">
-                                <p class="text-xs font-bold text-gray-700 mb-1">Pesanan FnB:</p>
-                                @if($activeSession->orders->isEmpty())
-                                    <p class="text-xs text-gray-400 italic">Belum ada pesanan</p>
-                                @else
-                                    <ul class="text-xs space-y-1 mb-2 max-h-24 overflow-y-auto">
+                            {{-- List Pesanan FnB yang sudah dipesan --}}
+                            <div class="mb-3">
+                                <span class="text-xs font-semibold text-gray-500">Pesanan FnB:</span>
+                                @if($activeSession->orders && $activeSession->orders->count() > 0)
+                                    <ul class="mt-1 space-y-1">
                                         @foreach($activeSession->orders as $order)
-                                            <li class="flex justify-between border-b pb-0.5">
-                                                <span>{{ $order->product->name }} (x{{$order->quantity }})</span>
-                                                <span class="font-mono">Rp {{ number_format($order->subtotal, 0, ',', '.') }}</span>
+                                            <li class="flex justify-between items-center text-xs bg-gray-50 p-1.5 rounded border border-gray-200">
+                                                <div>
+                                                    <span class="font-medium">{{ $order->product->name }}</span>
+                                                    <span class="text-gray-500">({{ $order->quantity }}x)</span>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-semibold text-gray-700">Rp {{ number_format($order->subtotal, 0, ',', '.') }}</span>
+                                                    
+                                                    {{-- 🟢 FORM TOMBOL HAPUS / BATAL ORDER --}}
+                                                    <form action="{{ route('rental.order.delete', $order->id) }}" method="POST" onsubmit="return confirm('Yakin ingin membatalkan pesanan {{ $order->product->name }}?')">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="text-red-500 hover:text-red-700 font-bold text-sm px-1" title="Batal/Hapus Pesanan">
+                                                            &times;
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             </li>
                                         @endforeach
                                     </ul>
+                                @else
+                                    <p class="text-xs text-gray-400 italic">Belum ada pesanan</p>
                                 @endif
                             </div>
 
                             {{-- FORM TAMBAH DURASI / PAKET (KHUSUS MODE PAKET) --}}
                             @if($activeSession->type === 'package')
-                            <form action="{{ route('rental.extend', $activeSession->id) }}" method="POST" class="border-t pt-2 space-y-1">
+                            <form action="{{ route('rental.extend', $activeSession->id) }}" method="POST" class="border-t border-gray-200 pt-2 mb-3">
                                 @csrf
-                                <label class="block text-xs font-bold text-gray-700">Perpanjang Paket:</label>
-                                <div class="flex gap-1.5">
-                                    <select name="package_id" class="text-xs border rounded p-1 flex-1 bg-white" required>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Perpanjang Paket:</label>
+                                <div class="flex items-center gap-1.5">
+                                    {{-- Dropdown Select paket --}}
+                                    <select name="package_id" class="w-full text-xs border-gray-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 py-1.5 px-2 bg-white min-w-0" required>
                                         <option value="">-- Pilih Tambah Paket --</option>
                                         @foreach($packages as $pkg)
                                             <option value="{{ $pkg->id }}">
@@ -133,7 +149,9 @@
                                             </option>
                                         @endforeach
                                     </select>
-                                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white text-xs px-2.5 py-1 rounded font-bold transition">
+                                    
+                                    {{-- Tombol + Tambah --}}
+                                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-2.5 py-1.5 rounded-lg shadow whitespace-nowrap transition flex-shrink-0">
                                         + Tambah
                                     </button>
                                 </div>

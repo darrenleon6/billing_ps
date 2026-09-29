@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\RentalSession;
 use App\Models\Console;
 use App\Models\Product;
+use App\Models\Order; // 🟢 1. Import Model Order
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB; // 🟢 2. Import DB Facade
 
 class AnalyticsController extends Controller
 {
-    public function index() // <-- Pastikan nama fungsinya adalah 'index'
+    public function index()
     {
         $today = Carbon::today();
         $startOfMonth = Carbon::now()->startOfMonth();
@@ -51,9 +53,15 @@ class AnalyticsController extends Controller
         ->take(5)
         ->get();
 
-        // 4. Peringatan Stok FnB Menipis (Stok <= 5)
-        $lowStockProducts = Product::where('stock', '<=', 5)
-            ->orderBy('stock', 'asc')
+        // 🟢 4. Produk FnB Terlaris (Tren FnB) menggantikan stok menipis
+        $popularProducts = Order::select('product_id', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(subtotal) as total_revenue'))
+            ->whereHas('rentalSession', function($q) {
+                $q->where('status', 'completed');
+            })
+            ->groupBy('product_id')
+            ->orderByDesc('total_qty')
+            ->with('product')
+            ->take(5)
             ->get();
 
         return view('reports.analytics', compact(
@@ -64,7 +72,8 @@ class AnalyticsController extends Controller
             'chartLabels',
             'chartData',
             'popularConsoles',
-            'lowStockProducts'
+            'popularProducts' // 🟢 Send popularProducts to view
         ));
+
     }
 }

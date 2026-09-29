@@ -131,29 +131,62 @@ class RentalController extends Controller
             'quantity'   => 'required|integer|min:1',
         ]);
 
+        $session = RentalSession::findOrFail($sessionId);
         $product = Product::findOrFail($request->product_id);
 
-        // 1. Cek ketersediaan stok
+        // Cek ketersediaan stok
         if ($product->stock < $request->quantity) {
-            return redirect()->back()->with('error', "Stok {$product->name} tidak mencukupi! Tersisa: {$product->stock}");
+            return redirect()->back()->with('error', 'Stok produk tidak mencukupi.');
         }
 
-        // 2. Buat order
-        $subtotal = $product->price * $request->quantity;
+        // 🟢 1. Cek apakah produk ini SUDAH ADA di sesi aktif ini
+        $existingOrder = Order::where('rental_session_id', $session->id)
+            ->where('product_id', $product->id)
+            ->first();
 
-        Order::create([
-            'rental_session_id' => $sessionId,
-            'product_id'        => $product->id,
-            'quantity'          => $request->quantity,
-            'price'             => $product->price,
-            'subtotal'          => $subtotal,
-        ]);
+        if ($existingOrder) {
+            // Jika sudah ada, cukup tambahkan quantity & subtotalnya
+            $existingOrder->quantity += $request->quantity;
+            $existingOrder->subtotal += ($product->price * $request->quantity);
+            $existingOrder->save();
+        } else {
+            // Jika belum ada, buat record order baru
+            Order::create([
+                'rental_session_id' => $session->id,
+                'product_id'        => $product->id,
+                'quantity'          => $request->quantity,
+                'price'             => $product->price,
+                'subtotal'          => $product->price * $request->quantity,
+            ]);
+        }
 
-        // 3. Potong stok otomatis
+        // Kurangi stok produk
         $product->decrement('stock', $request->quantity);
 
-        return redirect()->back()->with('success', 'Pesanan FnB berhasil ditambahkan!');
+        return redirect()->back()->with('success', 'Berhasil menambahkan pesanan FnB.');
     }
+
+    public function deleteOrder($id)
+    {
+        // 1. Cari data order beserta relasi produknya
+        $order = Order::with('product')->findOrFail($id);
+
+        // 2. Pastikan sesi rental-nya masih aktif (belum di-stop)
+        if ($order->rentalSession && $order->rentalSession->status !== 'active') {
+            return redirect()->back()->with('error', 'Pesanan tidak dapat dihapus karena sesi rental sudah selesai.');
+        }
+
+        // 🟢 3. Kembalikan stok produk jika relasi produk ditemukan
+        if ($order->product) {
+            $order->product->increment('stock', $order->quantity);
+        }
+
+        // 4. Hapus data order dari database
+        $order->delete();
+
+        return redirect()->back()->with('success', 'Pesanan FnB berhasil dibatalkan dan stok telah dikembalikan.');
+    }
+    
     public function printReceipt($id)
     {
         // Ambil data sesi rental beserta relasi console, paket, dan orders FnB

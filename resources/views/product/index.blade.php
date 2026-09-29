@@ -20,8 +20,8 @@
             </div>
         @endif
 
-        {{-- Grid Form & Table --}}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {{-- Grid Form & Table --}}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             {{-- Form Tambah Produk --}}
             <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 md:col-span-1">
@@ -121,7 +121,33 @@
 
         </div>
     </div>
+    <div class="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+     {{-- 🟢 TAMBAHKAN WIDGET PERINGATAN STOK MENIPIS DI SINI --}}
+            @php
+                $lowStockProducts = $products->filter(fn($p) => $p->stock <= 5);
+            @endphp
 
+            @if($lowStockProducts->count() > 0)
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm">
+                <div class="flex items-center gap-2 mb-3 text-amber-800 font-bold text-sm">
+                    <span>⚠️ Peringatan Stok FnB Menipis (Stok &le; 5 Pcs)</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    @foreach($lowStockProducts as $p)
+                    <div class="bg-white p-3 rounded-lg border border-amber-200 flex justify-between items-center shadow-xs">
+                        <div>
+                            <p class="font-bold text-xs text-gray-800">{{ $p->name }}</p>
+                            <p class="text-xs text-gray-500">Rp {{ number_format($p->price, 0, ',', '.') }}</p>
+                        </div>
+                        <span class="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                            Sisa: {{ $p->stock }}
+                        </span>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+    </div>
     {{-- Modal Edit / Restock Produk --}}
     <div id="editModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-5 space-y-4">

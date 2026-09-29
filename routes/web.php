@@ -21,6 +21,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/rental/stop/{session}', [RentalController::class, 'stopSession'])->name('rental.stop');
         Route::get('/rental/receipt/{id}', [RentalController::class, 'printReceipt'])->name('rental.receipt');
         Route::post('/rental/extend/{sessionId}', [RentalController::class, 'extendSession'])->name('rental.extend');
+        Route::delete('/rental/order/{order}', [RentalController::class, 'deleteOrder'])->name('rental.order.delete');
     });
 
     // 2. KHUSUS AKSES ADMIN (Stok, Laporan Transaksi, & Analytics)

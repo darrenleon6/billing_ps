@@ -23,21 +23,76 @@
             <span id="alertMessage"></span>
         </div>
 
-        {{-- Ringkasan Pendapatan (3 Kartu) --}}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                <span class="text-xs font-semibold text-gray-500 uppercase">Total Rental PS</span>
-                <p class="text-xl font-bold text-indigo-600 mt-1">Rp {{ number_format($totalRental ?? 0, 0, ',', '.') }}</p>
+        {{-- CONTAINER RINGKASAN LAPORAN --}}
+        <div class="space-y-4 mb-6">
+            
+            {{-- BARIS 1: PENDAPATAN UTAMA (HIGHLIGHT) --}}
+            {{-- BARIS 1: PENDAPATAN UTAMA (HIGHLIGHT) --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {{-- Total Pendapatan Keseluruhan --}}
+            <div class="bg-gradient-to-r from-slate-900 to-indigo-900 p-5 rounded-2xl shadow-sm text-white flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-indigo-200 uppercase tracking-wider">Total Pendapatan Keseluruhan</p>
+                    <h3 class="text-2xl font-black text-white mt-1">Rp {{ number_format($grandTotal, 0, ',', '.') }}</h3>
+                    <p class="text-[11px] text-indigo-300 mt-1">Sewa PS + Omset FnB Kotor</p>
+                </div>
+                {{-- 🟢 Menggunakan w-14 h-14 agar kotak lebih proporsional dengan teks 2xl --}}
+                <div class="w-14 h-14 flex-none bg-white/10 rounded-xl border border-white/10 flex flex-col items-center justify-center text-3xl">
+                    {{-- 🟢 Span dengan padding-bottom untuk mengangkat ikon secara paksa --}}
+                    <span class="pb-1">💵</span>
+                </div>
             </div>
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                <span class="text-xs font-semibold text-gray-500 uppercase">Total Penjualan FnB</span>
-                <p class="text-xl font-bold text-emerald-600 mt-1">Rp {{ number_format($totalFnB ?? 0, 0, ',', '.') }}</p>
-            </div>
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                <span class="text-xs font-semibold text-gray-500 uppercase">Total Pendapatan Keseluruhan</span>
-                <p class="text-xl font-bold text-gray-800 mt-1">Rp {{ number_format($grandTotal ?? 0, 0, ',', '.') }}</p>
+
+            {{-- Pendapatan Rental PS --}}
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Pendapatan Rental PS</p>
+                    <h3 class="text-2xl font-bold text-gray-800 mt-1">Rp {{ number_format($totalRental, 0, ',', '.') }}</h3>
+                    <p class="text-[11px] text-gray-400 mt-1">Murni dari biaya sewa konsol</p>
+                </div>
+                <div class="w-14 h-14 flex-none bg-indigo-50 text-indigo-600 rounded-xl flex flex-col items-center justify-center text-3xl">
+                    {{-- 🟢 Span dengan padding-bottom untuk mengangkat ikon secara paksa --}}
+                    <span class="pb-1">🎮</span>
+                </div>
             </div>
         </div>
+
+           {{-- BARIS 2: RINCIAN PERFORMA FNB (OMSET, MODAL, PROFIT) --}}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {{-- Omset FnB Kotor --}}
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Omset FnB (Kotor)</p>
+                        <h4 class="text-lg font-bold text-blue-600 mt-0.5">Rp {{ number_format($fnbRevenue, 0, ',', '.') }}</h4>
+                    </div>
+                    <div class="w-10 h-10 flex-none bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-2xl">
+                        🍿
+                    </div>
+                </div>
+
+                {{-- Modal FnB (HPP) --}}
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Modal FnB (HPP)</p>
+                        <h4 class="text-lg font-bold text-amber-600 mt-0.5">Rp {{ number_format($fnbHPP, 0, ',', '.') }}</h4>
+                    </div>
+                    <div class="w-10 h-10 flex-none bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-2xl">
+                        📦
+                    </div>
+                </div>
+
+                {{-- Laba Bersih FnB (Profit) --}}
+                <div class="bg-emerald-50/60 p-4 rounded-xl shadow-sm border border-emerald-200/80 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Laba Bersih FnB (Profit)</p>
+                        <h4 class="text-lg font-extrabold text-emerald-600 mt-0.5">Rp {{ number_format($fnbProfit, 0, ',', '.') }}</h4>
+                    </div>
+                    <div class="w-10 h-10 flex-none bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center text-2xl">
+                        💰
+                    </div>
+                </div>
+            </div>
+
 
         {{-- Form Filter Tanggal --}}
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
@@ -149,5 +204,7 @@
             return true;
         }
     </script>
+
+    
 </body>
 </html>

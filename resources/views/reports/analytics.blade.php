@@ -77,51 +77,57 @@
 
         </div>
 
-        {{-- 3. Alert Stok FnB Menipis --}}
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="p-4 border-b border-gray-200 bg-amber-50 flex justify-between items-center">
-                <span class="font-bold text-amber-800 text-xs flex items-center gap-1.5">
-                    ⚠️ Peringatan Stok FnB Menipis (Stok ≤ 5)
-                </span>
-                <a href="{{ route('products.index') }}" class="text-xs text-indigo-600 hover:underline font-semibold">Kelola Stok →</a>
+        {{-- WIDGET TREN FNB / PRODUK TERLARIS --}}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="font-bold text-gray-800 text-lg">🍿 Tren Penjualan FnB & Produk Terlaris</h3>
+                    <p class="text-xs text-gray-500">Produk yang paling banyak dipesan oleh pelanggan</p>
+                </div>
+                <a href="{{ route('products.index') }}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                    Lihat Semua Produk &rarr;
+                </a>
             </div>
+
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-600 uppercase border-b">
-                            <th class="p-3">Nama Produk</th>
-                            <th class="p-3">Harga Jual</th>
-                            <th class="p-3">Sisa Stok</th>
-                            <th class="p-3">Status</th>
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-gray-50 text-gray-600 uppercase font-semibold border-b border-gray-100">
+                        <tr>
+                            <th class="py-3 px-4">#</th>
+                            <th class="py-3 px-4">Nama Produk</th>
+                            <th class="py-3 px-4 text-center">Total Terjual</th>
+                            <th class="py-3 px-4 text-right">Total Pendapatan FnB</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        @forelse($lowStockProducts as $product)
-                            <tr class="hover:bg-gray-50">
-                                <td class="p-3 font-semibold text-gray-800">{{ $product->name }}</td>
-                                <td class="p-3 text-gray-600">Rp {{ number_format($product->price, 0, ',', '.') }}</td>
-                                <td class="p-3 font-bold {{ $product->stock == 0 ? 'text-red-600' : 'text-amber-600' }}">
-                                    {{ $product->stock }} Pcs
-                                </td>
-                                <td class="p-3">
-                                    @if($product->stock == 0)
-                                        <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold">Habis</span>
-                                    @else
-                                        <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold">Hampir Habis</span>
-                                    @endif
-                                </td>
-                            </tr>
+                    <tbody class="divide-y divide-gray-100">
+                        @forelse($popularProducts as $index => $item)
+                        <tr class="hover:bg-gray-50/50">
+                            <td class="py-3 px-4 font-bold text-gray-400">{{ $index + 1 }}</td>
+                            <td class="py-3 px-4 font-semibold text-gray-800">
+                                {{ $item->product->name ?? 'Produk Dihapus' }}
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="bg-indigo-50 text-indigo-700 font-bold px-2.5 py-1 rounded-full border border-indigo-100">
+                                    {{ $item->total_qty }} psc
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-right font-bold text-emerald-600">
+                                Rp {{ number_format($item->total_revenue, 0, ',', '.') }}
+                            </td>
+                        </tr>
                         @empty
-                            <tr>
-                                <td colspan="4" class="p-4 text-center text-gray-400 italic">
-                                    Semua stok produk FnB masih aman (di atas 5 Pcs).
-                                </td>
-                            </tr>
+                        <tr>
+                            <td colspan="4" class="text-center py-6 text-gray-400 italic">
+                                Belum ada data penjualan FnB.
+                            </td>
+                        </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
+
+        
 
     </div>
 

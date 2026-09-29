@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\RentalSession;
+use App\Models\Order; // 🟢 Jangan lupa import model Order
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB; // 🟢 Import DB Facade
 
 class ReportController extends Controller
 {
@@ -38,6 +40,30 @@ class ReportController extends Controller
         $totalFnB    = $sessions->sum('fnb_cost');
         $grandTotal  = $sessions->sum('total_cost');
 
+        // 🟢 1. TARUH KUERI FNB STATS DI SINI (SEBELUM RETURN VIEW)
+        // Kueri juga mendukung filter tanggal jika sedang digunakan
+        $fnbStats = Order::whereHas('rentalSession', function($q) use ($startDate, $endDate) {
+                $q->where('status', 'completed');
+                
+                if ($startDate && $endDate && $startDate <= $endDate) {
+                    $q->whereDate('end_time', '>=', $startDate)
+                      ->whereDate('end_time', '<=', $endDate);
+                }
+            })
+            ->join('products', 'orders.product_id', '=', 'products.id')
+            ->selectRaw('
+                SUM(orders.subtotal) as total_omset,
+                SUM(orders.quantity * products.cost_price) as total_hpp,
+                SUM(orders.subtotal - (orders.quantity * products.cost_price)) as total_profit
+            ')
+            ->first();
+
+        // Assign variabel hasil kueri
+        $fnbRevenue = $fnbStats->total_omset ?? 0;
+        $fnbHPP     = $fnbStats->total_hpp ?? 0;
+        $fnbProfit  = $fnbStats->total_profit ?? 0;
+
+        // 🟢 2. RETURN VIEW DILETAKKAN PALING BAWAH
         return view('reports.transactions', compact(
             'sessions',
             'totalRental',
@@ -45,7 +71,10 @@ class ReportController extends Controller
             'grandTotal',
             'startDate',
             'endDate',
-            'errorMessage'
+            'errorMessage',
+            'fnbRevenue',
+            'fnbHPP',
+            'fnbProfit'
         ));
     }
 }
