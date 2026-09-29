@@ -17,6 +17,12 @@
                    class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('dashboard') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
                     Dashboard Rental
                 </a>
+
+                <!-- Link Laporan Shift Operator -->
+                <a href="{{ route('reports.shifts') }}" 
+                    class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('reports.shifts') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                    Laporan Shift
+                </a>
                 
                {{-- Menu Khusus Admin Saja --}}
                 @if(auth()->user()->isAdmin())

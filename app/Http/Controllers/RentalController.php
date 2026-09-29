@@ -9,6 +9,8 @@ use App\Models\Package;
 use App\Models\RentalSession;
 use App\Models\Order;
 use Carbon\Carbon;
+use App\Models\Shift; // 🟢 Jangan lupa import model Shift di bagian atas controller
+use Illuminate\Support\Facades\Auth;
 
 class RentalController extends Controller
 {
@@ -36,6 +38,15 @@ class RentalController extends Controller
 
     public function startSession(Request $request)
     {
+        // 🟢 1. Cek apakah ada shift yang sedang AKTIF untuk user/kasir yang login
+        $activeShift = Shift::where('user_id', Auth::id())
+            ->where('status', 'open')
+            ->first();
+
+        if (!$activeShift) {
+            return redirect()->back()->with('error', 'Gagal memulai rental! Kamu harus Buka Shift terlebih dahulu.');
+        }
+
         $request->validate([
             'console_id' => 'required|exists:consoles,id',
             'type' => 'required|in:open,package',
@@ -53,10 +64,12 @@ class RentalController extends Controller
 
         RentalSession::create([
             'console_id' => $request->console_id,
+            'user_id'    => Auth::id(),        // 🟢 Catat siapa kasir yang melayani
+            'shift_id'   => $activeShift->id,  // 🟢 KUNCI DI SINI: Kaitkan transaksi ke Shift Aktif
             'package_id' => $request->type === 'package' ? $request->package_id : null,
-            'type' => $request->type,
+            'type'       => $request->type,
             'start_time' => Carbon::now(),
-            'status' => 'active',
+            'status'     => 'active',
         ]);
 
         return redirect()->back()->with('success', 'Sesi rental berhasil dimulai!');
@@ -64,11 +77,13 @@ class RentalController extends Controller
 
 
 
-    public function stopSession(Request $request, $id) // <-- Tambahkan parameter Request $request
+    public function stopSession(Request $request, $id)
     {
-        // 1. Validasi input metode pembayaran dari form
+        // 1. Validasi input metode pembayaran (ditambahkan opsi 'split')
         $request->validate([
-            'payment_method' => ['required', 'string', 'in:cash,qris'],
+            'payment_method' => ['required', 'string', 'in:cash,qris,split'],
+            'cash_amount' => ['required_if:payment_method,split', 'nullable', 'numeric', 'min:0'],
+            'qris_amount' => ['required_if:payment_method,split', 'nullable', 'numeric', 'min:0'],
         ]);
 
         $session = RentalSession::with(['console', 'package', 'orders'])->findOrFail($id);
@@ -106,21 +121,44 @@ class RentalController extends Controller
 
         // --- Hitung Total FnB & Grand Total ---
         $fnbCost = $session->orders->sum('subtotal');
-        $totalCost = $rentalCost + $fnbCost;
+        $grandTotal = $rentalCost + $fnbCost;
 
-        // --- Simpan Perubahan Termasuk Payment Method ---
+        // --- Pembagian Nominal Cash & QRIS (Split Payment) ---
+        $paymentMethod = $request->payment_method;
+        $cashAmount = 0;
+        $qrisAmount = 0;
+
+        if ($paymentMethod === 'cash') {
+            $cashAmount = $grandTotal;
+            $qrisAmount = 0;
+        } elseif ($paymentMethod === 'qris') {
+            $cashAmount = 0;
+            $qrisAmount = $grandTotal;
+        } elseif ($paymentMethod === 'split') {
+            $cashAmount = (float) $request->cash_amount;
+            $qrisAmount = (float) $request->qris_amount;
+
+            // Validasi: Jumlah gabungan Cash + QRIS tidak boleh kurang dari Total Biaya
+            if (($cashAmount + $qrisAmount) < $grandTotal) {
+                return redirect()->back()->with('error', 'Jumlah pembayaran (Cash + QRIS) kurang dari total tagihan (Rp ' . number_format($grandTotal, 0, ',', '.') . ')!');
+            }
+        }
+
+        // --- Simpan Perubahan Sesi Rental ---
         $session->update([
-            'end_time' => $endTime,
-            'rental_cost' => $rentalCost,
-            'fnb_cost' => $fnbCost,
-            'total_cost' => $totalCost,
-            'payment_method' => $request->payment_method, // <-- SIMPAN DI SINI
-            'status' => 'completed',
+            'end_time'       => $endTime,
+            'rental_cost'    => $rentalCost,
+            'fnb_cost'       => $fnbCost,
+            'total_cost'     => $grandTotal,
+            'payment_method' => $paymentMethod,
+            'cash_amount'    => $cashAmount, // 🟢 Menyimpan pecahan nominal cash
+            'qris_amount'    => $qrisAmount, // 🟢 Menyimpan pecahan nominal qris
+            'status'         => 'completed',
         ]);
 
         // Kembalikan ke dashboard dengan membawa ID sesi yang baru di-stop
         return redirect()->back()->with([
-            'success' => 'Sesi rental berhasil diselesaikan!',
+            'success'         => 'Sesi rental berhasil diselesaikan!',
             'show_receipt_id' => $session->id
         ]);
     }

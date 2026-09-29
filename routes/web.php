@@ -5,6 +5,7 @@ use App\Http\Controllers\RentalController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\ShiftController; // 🟢 Tambahkan baris ini di paling atas routes/web.php
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -22,6 +23,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/rental/receipt/{id}', [RentalController::class, 'printReceipt'])->name('rental.receipt');
         Route::post('/rental/extend/{sessionId}', [RentalController::class, 'extendSession'])->name('rental.extend');
         Route::delete('/rental/order/{order}', [RentalController::class, 'deleteOrder'])->name('rental.order.delete');
+        Route::post('/shift/start', [ShiftController::class, 'start'])->name('shift.start');
+        Route::post('/shift/{shift}/stop', [ShiftController::class, 'stop'])->name('shift.stop');
+        Route::get('/reports/shifts', [ShiftController::class, 'index'])->name('reports.shifts');
+
+   
     });
 
     // 2. KHUSUS AKSES ADMIN (Stok, Laporan Transaksi, & Analytics)

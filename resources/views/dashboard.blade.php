@@ -13,6 +13,46 @@
     <div class="container mx-auto p-6">
         <h1 class="text-3xl font-bold mb-6 text-indigo-700">🎮 Dashboard Billing Rental PS</h1>
 
+        @if(!$activeShift)
+        {{-- MODAL BUKA SHIFT (Jika belum Buka Shift) --}}
+        <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">⚠️</span>
+                <div>
+                    <h4 class="font-bold text-amber-800 text-sm">Shift Belum Dibuka</h4>
+                    <p class="text-xs text-amber-600">Buka shift terlebih dahulu untuk dapat memulai transaksi rental.</p>
+                </div>
+            </div>
+            
+            <form action="{{ route('shift.start') }}" method="POST" class="flex gap-2">
+                @csrf
+                <input type="number" name="starting_cash" placeholder="Kas Awal (Rp)" required class="text-xs border-amber-300 rounded-lg p-2 w-36">
+                <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-lg">
+                    Mulai Shift
+                </button>
+            </form>
+        </div>
+    @else
+        {{-- BAR INDIKATOR SHIFT AKTIF --}}
+        <div class="bg-indigo-50 border border-indigo-200 p-3 rounded-xl mb-6 flex justify-between items-center text-xs">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-bold text-indigo-900">Shift Aktif Sejak: {{ \Carbon\Carbon::parse($activeShift->start_time)->format('H:i') }}</span>
+                <span class="text-indigo-400">|</span>
+                <span class="text-indigo-700">Modal Awal: <strong>Rp {{ number_format($activeShift->starting_cash, 0, ',', '.') }}</strong></span>
+            </div>
+
+            {{-- Form Tutup Shift --}}
+            <form action="{{ route('shift.stop', $activeShift->id) }}" method="POST" onsubmit="return confirm('Tutup shift sekarang?')" class="flex gap-2 items-center">
+                @csrf
+                <input type="number" name="actual_cash" placeholder="Uang Tunai di Laci (Rp)" required class="text-xs border-indigo-300 rounded-lg p-1.5 w-44">
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-lg">
+                    Tutup Shift
+                </button>
+            </form>
+        </div>
+    @endif
+
         {{-- Flash Message Notifikasi --}}
         @if(session('success'))
             <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
@@ -189,19 +229,83 @@
                                         </button>
                                     </form>
 
+                                    {{-- HITUNG ESTIMASI TAGIHAN SEMENTARA --}}
+                                    @php
+                                        $startTime = \Carbon\Carbon::parse($activeSession->start_time);
+                                        $now = \Carbon\Carbon::now();
+                                        $totalMinutes = $startTime->diffInMinutes($now);
+
+                                        $estimatedRentalCost = 0;
+                                        if ($activeSession->type === 'package' && $activeSession->package) {
+                                            $estimatedRentalCost = $activeSession->package->price + $activeSession->extended_cost;
+                                            $allowedDuration = $activeSession->package->duration_minutes + $activeSession->extended_minutes;
+                                            
+                                            if ($totalMinutes > $allowedDuration) {
+                                                $extraMinutes = $totalMinutes - $allowedDuration;
+                                                $extraBlocks = floor($extraMinutes / 15);
+                                                $ratePerBlock = $activeSession->console->hourly_rate / 4;
+                                                $estimatedRentalCost += ($extraBlocks * $ratePerBlock);
+                                            }
+                                        } else {
+                                            $billableBlocks = floor($totalMinutes / 15);
+                                            $ratePerBlock = $activeSession->console->hourly_rate / 4;
+                                            $estimatedRentalCost = $billableBlocks * $ratePerBlock;
+                                        }
+
+                                        $fnbCost = $activeSession->orders->sum('subtotal');
+                                        $grandTotal = $estimatedRentalCost + $fnbCost;
+                                    @endphp
+
                                     {{-- FORM STOP RENTAL --}}
-                                    <form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="space-y-1.5">
+                                    <form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="space-y-2 mt-auto">
                                         @csrf
-                                        <div class="flex items-center gap-2">
-                                            <label class="text-[11px] font-medium text-gray-600 flex-none">Bayar:</label>
-                                            <select name="payment_method" required class="text-xs border border-gray-300 rounded-lg p-1 flex-1 bg-white min-w-0">
-                                                <option value="cash">Tunai (Cash)</option>
-                                                <option value="qris">QRIS / Transfer</option>
-                                            </select>
+
+                                        {{-- 🟢 TOTAL TAGIHAN BERWARNA & BORDER --}}
+                                        <div class="flex justify-between items-center px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg shadow-2xs my-1.5">
+                                            <span class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Total Tagihan</span>
+                                            <span class="text-sm font-black text-slate-900">
+                                                Rp {{ number_format($grandTotal, 0, ',', '.') }}
+                                            </span>
+                                        </div>
+
+                                        {{-- PILIHAN METODE PEMBAYARAN --}}
+                                        <div class="space-y-1.5" x-data="{ method: 'cash', total: {{ $grandTotal }} }">
+                                            <div class="flex items-center gap-2">
+                                                <label class="text-[11px] font-medium text-gray-600 flex-none">Metode:</label>
+                                                <select name="payment_method" 
+                                                        x-model="method" 
+                                                        onchange="document.getElementById('split-input-{{ $activeSession->id }}').style.display = (this.value === 'split') ? 'grid' : 'none'" 
+                                                        required 
+                                                        class="w-full text-xs border-gray-300 rounded-lg py-1 px-1.5">
+                                                    <option value="cash">Tunai (Full Cash)</option>
+                                                    <option value="qris">QRIS / Transfer (Full QRIS)</option>
+                                                    <option value="split">🔀 Split (Cash + QRIS)</option>
+                                                </select>
+                                            </div>
+
+                                            {{-- INPUT SPLIT PAYMENT DENGAN KALKULATOR OTOMATIS --}}
+                                            <div id="split-input-{{ $activeSession->id }}" style="display: none;" class="grid-cols-2 gap-1.5 pt-1">
+                                                <div>
+                                                    <label class="text-[10px] text-gray-500 font-bold">Bayar Cash (Rp)</label>
+                                                    <input type="number" 
+                                                        name="cash_amount" 
+                                                        placeholder="0" 
+                                                        @input="$refs.qrisInput.value = Math.max(0, total - $el.value)"
+                                                        class="w-full text-xs border-gray-300 rounded-lg p-1">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[10px] text-gray-500 font-bold">Bayar QRIS (Rp)</label>
+                                                    <input type="number" 
+                                                        x-ref="qrisInput"
+                                                        name="qris_amount" 
+                                                        placeholder="0" 
+                                                        class="w-full text-xs border-gray-300 rounded-lg p-1">
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <button type="submit" onclick="return confirm('Selesaikan sesi rental ini?')" 
-                                                class="w-full bg-red-600 hover:bg-red-700 text-white py-1.5 rounded-lg font-semibold transition text-xs shadow-2xs">
+                                                class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-xl font-bold transition text-xs shadow-sm hover:shadow-md mt-2">
                                             Stop & Cetak Struk
                                         </button>
                                     </form>
@@ -411,8 +515,8 @@
                     <td class="text-right pt-1 font-bold uppercase">
                         @if(($receiptSession->payment_method ?? 'cash') === 'qris')
                             QRIS / Transfer
-                        @elseif(($receiptSession->payment_method ?? 'cash') === 'debit')
-                            Kartu Debit
+                        @elseif(($receiptSession->payment_method ?? 'cash') === 'split')
+                            Split Payment
                         @else
                             Cash / Tunai
                         @endif
