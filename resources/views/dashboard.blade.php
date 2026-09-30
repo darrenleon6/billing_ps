@@ -131,6 +131,7 @@
                                 <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2.5 rounded-lg transition mt-auto shadow">
                                     ▶️ Mulai Rental
                                 </button>
+
                             </form>
 
                         @else
@@ -304,10 +305,37 @@
                                             </div>
                                         </div>
 
-                                        <button type="submit" onclick="return confirm('Selesaikan sesi rental ini?')" 
-                                                class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-xl font-bold transition text-xs shadow-sm hover:shadow-md mt-2">
-                                            Stop & Cetak Struk
-                                        </button>
+                                        @php
+                                            $hasOpenShift = \App\Models\Shift::where('user_id', auth()->id())
+                                                ->where('status', 'open')
+                                                ->exists();
+                                        @endphp
+
+                                        @if(!$hasOpenShift)
+                                            {{-- Tombol mati jika Shift belum dibuka --}}
+                                            <button type="button" 
+                                                    onclick="alert('Buka Shift terlebih dahulu sebelum menyelesaikan sesi rental!')" 
+                                                    class="w-full bg-gray-400 text-white py-2 rounded-xl font-bold text-xs cursor-not-allowed mt-2">
+                                                🔒 Buka Shift Untuk Hentikan Sesi
+                                            </button>
+                                        @else
+                                            {{-- Tombol normal jika Shift sudah dibuka --}}
+                                            <div class="mt-4 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
+                                            {{-- 1. Tombol Pindah Konsol --}}
+                                            <button type="button" 
+                                                    onclick="openTransferModal({{ $activeSession->id }}, '{{ $console->name }}')"
+                                                    class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                                                🔄 <span>Pindah Unit</span>
+                                            </button>
+
+                                            {{-- 2. Tombol Stop & Struk --}}
+                                            <button type="submit" onclick="return confirm('Selesaikan sesi rental ini?')" 
+                                                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                                                🛑 <span>Stop & Struk</span>
+                                            </button>
+                                        </div>
+
+                                        @endif
                                     </form>
                                 </div>
                             </div>
@@ -318,95 +346,141 @@
             @endforeach
         </div>
 
-    {{-- JAVASCRIPT UNTUK DROPDOWN & TIMER LIVE --}}
-    <script>
-    function togglePackageDropdown(consoleId) {
-        const modeSelect = document.getElementById('type_select_' + consoleId);
-        const packageContainer = document.getElementById('package_container_' + consoleId);
+   {{-- JAVASCRIPT UNTUK DROPDOWN & TIMER LIVE --}}
+<script>
+function togglePackageDropdown(consoleId) {
+    const modeSelect = document.getElementById('type_select_' + consoleId);
+    const packageContainer = document.getElementById('package_container_' + consoleId);
 
-        if (modeSelect.value === 'package') {
-            packageContainer.classList.remove('hidden');
-        } else {
-            packageContainer.classList.add('hidden');
-        }
+    if (modeSelect.value === 'package') {
+        packageContainer.classList.remove('hidden');
+    } else {
+        packageContainer.classList.add('hidden');
     }
+}
 
-    function updateTimers() {
-        const timers = document.querySelectorAll('.timer-display');
+// 🔔 Fungsi Memutar Audio Alarm dari File Lokal (public/sounds/alarm.mp3)
+function playAlarmSound() {
+    // Memanggil file alarm.mp3 dari folder public/sounds/
+    const alarmAudio = new Audio('/sounds/alarm.mp3');
+    
+    alarmAudio.volume = 1.0; // Volume maksimal (100%)
+    
+    alarmAudio.play().catch(error => {
+        console.log('Autoplay audio diblokir oleh browser. Klik area mana saja di layar untuk mengaktifkan suara alarm.');
+    });
+}
 
-        timers.forEach(timer => {
-            const startTime = new Date(timer.dataset.start).getTime();
-            // Ambil durasi paket dasar
-            const baseDuration = timer.dataset.duration ? parseInt(timer.dataset.duration) : null;
-            // Ambil durasi perpanjangan (extended_minutes)
-            const extendedDuration = timer.dataset.extended ? parseInt(timer.dataset.extended) : 0;
-            
-            const now = new Date().getTime();
+function updateTimers() {
+    const timers = document.querySelectorAll('.timer-display');
 
-            const elapsedSeconds = Math.floor((now - startTime) / 1000);
-            if (elapsedSeconds < 0) return;
+    timers.forEach(timer => {
+        const startTime = new Date(timer.dataset.start).getTime();
+        // Ambil durasi paket dasar
+        const baseDuration = timer.dataset.duration ? parseInt(timer.dataset.duration) : null;
+        // Ambil durasi perpanjangan (extended_minutes)
+        const extendedDuration = timer.dataset.extended ? parseInt(timer.dataset.extended) : 0;
 
-            const extraInfo = timer.nextElementSibling;
+        const now = new Date().getTime();
 
-            // ==========================================
-            // KONDISI 1: MODE PAKET (COUNTDOWN MUNDUR)
-            // ==========================================
-            if (baseDuration !== null) {
-                // TOTAL WAKTU PAKET = WAKTU AWAL + WAKTU PERPANJANGAN
-                const totalPackageMinutes = baseDuration + extendedDuration;
-                const totalPackageSeconds = totalPackageMinutes * 60;
-                const remainingSeconds = totalPackageSeconds - elapsedSeconds;
+        const elapsedSeconds = Math.floor((now - startTime) / 1000);
+        if (elapsedSeconds < 0) return;
 
-                if (remainingSeconds >= 0) {
-                    // Masih ada sisa waktu paket (Hitung Mundur)
-                    const hours = String(Math.floor(remainingSeconds / 3600)).padStart(2, '0');
-                    const minutes = String(Math.floor((remainingSeconds % 3600) / 60)).padStart(2, '0');
-                    const seconds = String(remainingSeconds % 60).padStart(2, '0');
+        const extraInfo = timer.nextElementSibling;
 
-                    timer.textContent = `${hours}:${minutes}:${seconds}`;
-                    timer.className = 'text-2xl font-bold tracking-wider text-green-400 timer-display';
+        // ===========================================
+        // KONDISI 1: MODE PAKET (COUNTDOWN MUNDUR)
+        // ===========================================
+        if (baseDuration !== null) {
+            // TOTAL WAKTU PAKET = WAKTU AWAL + WAKTU PERPANJANGAN
+            const totalPackageMinutes = baseDuration + extendedDuration;
+            const totalPackageSeconds = totalPackageMinutes * 60;
+            const remainingSeconds = totalPackageSeconds - elapsedSeconds;
 
-                    if (extraInfo) {
-                        extraInfo.textContent = extendedDuration > 0 ? `⏳ Sisa Waktu (+${extendedDuration} mnt)` : '⏳ Sisa Waktu Paket';
-                        extraInfo.className = 'text-[10px] text-green-300 mt-1 extra-info';
-                    }
-                } else {
-                    // Waktu Paket Habis -> Overtime
-                    const overSeconds = Math.abs(remainingSeconds);
-                    const hours = String(Math.floor(overSeconds / 3600)).padStart(2, '0');
-                    const minutes = String(Math.floor((overSeconds % 3600) / 60)).padStart(2, '0');
-                    const seconds = String(overSeconds % 60).padStart(2, '0');
-
-                    timer.textContent = `+${hours}:${minutes}:${seconds}`;
-                    timer.className = 'text-2xl font-bold tracking-wider text-red-500 animate-pulse timer-display';
-
-                    if (extraInfo) {
-                        extraInfo.textContent = '⚠️ WAKTU PAKET HABIS (OVERTIME)';
-                        extraInfo.className = 'text-[10px] text-red-400 font-bold mt-1 extra-info';
-                    }
-                }
-            } 
-            // ==========================================
-            // KONDISI 2: OPEN PLAY (COUNT UP MAJU)
-            // ==========================================
-            else {
-                const hours = String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0');
-                const minutes = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, '0');
-                const seconds = String(elapsedSeconds % 60).padStart(2, '0');
+            if (remainingSeconds >= 0) {
+                // Masih ada sisa waktu paket (Hitung Mundur)
+                const hours = String(Math.floor(remainingSeconds / 3600)).padStart(2, '0');
+                const minutes = String(Math.floor((remainingSeconds % 3600) / 60)).padStart(2, '0');
+                const seconds = String(Math.floor(remainingSeconds % 60)).padStart(2, '0');
 
                 timer.textContent = `${hours}:${minutes}:${seconds}`;
-                timer.className = 'text-2xl font-bold tracking-wider text-green-400 timer-display';
+
+                // --- INDIKATOR WARNA & ALARM ---
+                if (remainingSeconds <= 300) {
+                    // 🟠 SISA WAKTU <= 5 MENIT (Oranye Kedip + Alarm 1x)
+                    timer.className = 'text-2xl font-bold tracking-wider text-orange-500 animate-pulse timer-display';
+                    if (extraInfo) {
+                        extraInfo.textContent = extendedDuration > 0 ? `⏳ Sisa Waktu (+${extendedDuration} mnt)` : '⏳ Sisa Waktu (< 5 Mnt)';
+                        extraInfo.className = 'text-[10px] text-orange-400 font-bold mt-1 extra-info';
+                    }
+
+                    // Bunyi alarm jika baru pertama kali menyentuh 5 menit terakhir
+                    if (timer.dataset.alerted5min !== 'true') {
+                        playAlarmSound();
+                        timer.dataset.alerted5min = 'true';
+                    }
+
+                } else if (remainingSeconds <= 900) {
+                    // 🟡 SISA WAKTU <= 15 MENIT (Kuning)
+                    timer.className = 'text-2xl font-bold tracking-wider text-yellow-500 timer-display';
+                    if (extraInfo) {
+                        extraInfo.textContent = extendedDuration > 0 ? `⏳ Sisa Waktu (+${extendedDuration} mnt)` : '⏳ Sisa Waktu (< 15 Mnt)';
+                        extraInfo.className = 'text-[10px] text-yellow-400 font-bold mt-1 extra-info';
+                    }
+
+                } else {
+                    // 🟢 NORMAL (> 15 MENIT)
+                    timer.className = 'text-2xl font-bold tracking-wider text-green-400 timer-display';
+                    if (extraInfo) {
+                        extraInfo.textContent = extendedDuration > 0 ? `⏳ Sisa Waktu (+${extendedDuration} mnt)` : '⏳ Sisa Waktu';
+                        extraInfo.className = 'text-[10px] text-green-300 mt-1 extra-info';
+                    }
+                }
+
+            } else {
+                // 🔴 WAKTU PAKET HABIS -> OVERTIME
+                const overSeconds = Math.abs(remainingSeconds);
+                const hours = String(Math.floor(overSeconds / 3600)).padStart(2, '0');
+                const minutes = String(Math.floor((overSeconds % 3600) / 60)).padStart(2, '0');
+                const seconds = String(Math.floor(overSeconds % 60)).padStart(2, '0');
+
+                timer.textContent = `+${hours}:${minutes}:${seconds}`;
+                timer.className = 'text-2xl font-bold tracking-wider text-red-500 animate-pulse timer-display';
 
                 if (extraInfo) {
-                    extraInfo.textContent = '⏱️ Open Play';
-                    extraInfo.className = 'text-[10px] text-gray-400 mt-1 extra-info';
+                    extraInfo.textContent = '⚠️️ WAKTU PAKET HABIS (OVERTIME)';
+                    extraInfo.className = 'text-[10px] text-red-400 font-bold mt-1 extra-info';
+                }
+
+                // Bunyi alarm saat waktu tepat habis
+                if (timer.dataset.alertedfinished !== 'true') {
+                    playAlarmSound();
+                    timer.dataset.alertedfinished = 'true';
                 }
             }
-        });
-    }
 
-    setInterval(updateTimers, 1000);
-    updateTimers();
+        } 
+        // ===========================================
+        // KONDISI 2: OPEN PLAY (COUNT UP MAJU)
+        // ===========================================
+        else {
+            const hours = String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, '0');
+            const seconds = String(Math.floor(elapsedSeconds % 60)).padStart(2, '0');
+
+            timer.textContent = `${hours}:${minutes}:${seconds}`;
+            timer.className = 'text-2xl font-bold tracking-wider text-green-400 timer-display';
+
+            if (extraInfo) {
+                extraInfo.textContent = '⏱️ Open Play';
+                extraInfo.className = 'text-[10px] text-gray-400 mt-1 extra-info';
+            }
+        }
+    });
+}
+
+setInterval(updateTimers, 1000);
+updateTimers();
 </script>
 <!-- Modal Pop-Up Struk (Tailwind CSS) -->
 @if(session('show_receipt_id'))
@@ -550,5 +624,59 @@
     </script>
     @endif
 @endif
+
+{{-- MODAL PINDAH KONSOL --}}
+<div id="transferModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative">
+        <h3 class="text-base font-bold text-gray-800 mb-1">Pindah Konsol / Unit</h3>
+        <p class="text-xs text-gray-500 mb-4">Pindahkan sesi berjalan dari <span id="currentConsoleName" class="font-bold text-indigo-600"></span> ke unit lain.</p>
+
+        <form id="transferForm" method="POST" action="">
+            @csrf
+            
+            <div class="mb-5">
+                <label class="block text-xs font-bold text-gray-700 mb-2">Pilih Konsol Tujuan (Tersedia):</label>
+                <select name="new_console_id" required class="w-full text-xs border border-gray-300 rounded-xl p-2.5 bg-white text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm">
+                    <option value="">-- Pilih Unit Kosong --</option>
+                    
+                    @forelse($availableConsoles as $console)
+                        <option value="{{ $console->id }}">
+                            {{ $console->name }} (Rp {{ number_format($console->hourly_rate ?? 0, 0, ',', '.') }}/jam)
+                        </option>
+                    @empty
+                        <option value="" disabled class="text-gray-400">⚠️ Tidak ada unit lain yang sedang kosong</option>
+                    @endforelse
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeTransferModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition">
+                    Batal
+                </button>
+                <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition shadow-sm">
+                    Konfirmasi Pindah
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+function openTransferModal(sessionId, consoleName) {
+    const modal = document.getElementById('transferModal');
+    const form = document.getElementById('transferForm');
+    const consoleNameDisplay = document.getElementById('currentConsoleName');
+
+    // Set action URL form secara dinamis
+    form.action = `/rental-sessions/${sessionId}/transfer`;
+    consoleNameDisplay.innerText = consoleName;
+
+    modal.classList.remove('hidden');
+}
+
+function closeTransferModal() {
+    const modal = document.getElementById('transferModal');
+    modal.classList.add('hidden');
+}
+</script>
 </body>
 </html>

@@ -11,30 +11,37 @@ use App\Models\Order;
 use Carbon\Carbon;
 use App\Models\Shift; // 🟢 Jangan lupa import model Shift di bagian atas controller
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class RentalController extends Controller
 {
-  public function index()
-{
-    // 1. Ambil semua console beserta sesi aktif
-    $consoles = Console::with(['sessions' => function ($query) {
-        $query->where('status', 'active')->with(['orders.product', 'package']);
-    }])->orderBy('id', 'asc')->get();
+    public function index()
+    {
+        // 1. Ambil semua console beserta sesi aktif
+        $consoles = Console::with(['sessions' => function ($query) {
+            $query->where('status', 'active')->with(['orders.product', 'package']);
+        }])->orderBy('id', 'asc')->get();
 
-    // 2. Ambil produk FnB & Paket
-    $products = Product::orderBy('name', 'asc')->get();
-    $packages = Package::all();
+        // 2. Ambil produk FnB & Paket
+        $products = Product::orderBy('name', 'asc')->get();
+        $packages = Package::all();
 
-    // 🟢 3. TAMBAHKAN BAGIAN INI (Cek apakah ada request cetak/tampil struk)
-    $receiptSession = null;
-    if (session('show_receipt_id')) {
-        $receiptSession = RentalSession::with(['console', 'package', 'orders.product'])
-            ->find(session('show_receipt_id'));
+        // 🟢 3. Ambil daftar konsol yang kosong (available) untuk Modal Pindah Konsol
+        // Ambil konsol yang TIDAK SEDANG MEMILIKI sesi aktif saat ini
+        $availableConsoles = Console::whereDoesntHave('sessions', function ($query) {
+            $query->where('status', 'active');
+        })->orderBy('name', 'asc')->get();
+
+        // 4. Cek apakah ada request cetak/tampil struk
+        $receiptSession = null;
+        if (session('show_receipt_id')) {
+            $receiptSession = RentalSession::with(['console', 'package', 'orders.product'])
+                ->find(session('show_receipt_id'));
+        }
+
+        // 🟢 5. Masukkan 'availableConsoles' ke dalam compact()
+        return view('dashboard', compact('consoles', 'products', 'packages', 'receiptSession', 'availableConsoles'));
     }
-
-    // 🟢 4. Masukkan 'receiptSession' ke dalam compact()
-    return view('dashboard', compact('consoles', 'products', 'packages', 'receiptSession'));
-}
 
     public function startSession(Request $request)
     {
@@ -75,15 +82,22 @@ class RentalController extends Controller
         return redirect()->back()->with('success', 'Sesi rental berhasil dimulai!');
     }
 
-
-
     public function stopSession(Request $request, $id)
     {
+        // 0. 🛑 VALIDASI SHIFT: Pastikan kasir memiliki Shift Aktif yang sedang terbuka
+        $activeShift = \App\Models\Shift::where('user_id', Auth::id())
+            ->where('status', 'open')
+            ->first();
+
+        if (!$activeShift) {
+            return redirect()->back()->with('error', 'Transaksi gagal! Kamu harus membuka Shift terlebih dahulu sebelum menghentikan sesi dan menerima pembayaran.');
+        }
+
         // 1. Validasi input metode pembayaran (ditambahkan opsi 'split')
         $request->validate([
             'payment_method' => ['required', 'string', 'in:cash,qris,split'],
-            'cash_amount' => ['required_if:payment_method,split', 'nullable', 'numeric', 'min:0'],
-            'qris_amount' => ['required_if:payment_method,split', 'nullable', 'numeric', 'min:0'],
+            'cash_amount'    => ['required_if:payment_method,split', 'nullable', 'numeric', 'min:0'],
+            'qris_amount'    => ['required_if:payment_method,split', 'nullable', 'numeric', 'min:0'],
         ]);
 
         $session = RentalSession::with(['console', 'package', 'orders'])->findOrFail($id);
@@ -146,13 +160,14 @@ class RentalController extends Controller
 
         // --- Simpan Perubahan Sesi Rental ---
         $session->update([
+            'shift_id'       => $activeShift->id, // 🟢 Mengikat transaksi ke Shift Aktif kasir saat ini
             'end_time'       => $endTime,
             'rental_cost'    => $rentalCost,
             'fnb_cost'       => $fnbCost,
             'total_cost'     => $grandTotal,
             'payment_method' => $paymentMethod,
-            'cash_amount'    => $cashAmount, // 🟢 Menyimpan pecahan nominal cash
-            'qris_amount'    => $qrisAmount, // 🟢 Menyimpan pecahan nominal qris
+            'cash_amount'    => $cashAmount,
+            'qris_amount'    => $qrisAmount,
             'status'         => 'completed',
         ]);
 
@@ -255,5 +270,46 @@ class RentalController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Paket berhasil diperpanjang!');
+    }
+
+  public function transferConsole(Request $request, $id)
+    {
+        $request->validate([
+            'new_console_id' => ['required', 'exists:consoles,id'],
+        ]);
+
+        $session = RentalSession::with('console')->findOrFail($id);
+        $newConsole = Console::findOrFail($request->new_console_id);
+
+        // 1. Validasi: Pastikan konsol tujuan tidak sama dengan konsol saat ini
+        if ($session->console_id == $newConsole->id) {
+            return redirect()->back()->with('error', 'Konsol tujuan tidak boleh sama dengan konsol saat ini!');
+        }
+
+        // 2. Validasi Fleksibel: Cek apakah konsol tujuan benar-benar sedang dipadakai sesi aktif
+        $isTargetOccupied = $newConsole->sessions()->where('status', 'active')->exists();
+        if ($isTargetOccupied) {
+            return redirect()->back()->with('error', 'Konsol tujuan sedang digunakan oleh sesi lain!');
+        }
+
+        DB::transaction(function () use ($session, $newConsole) {
+            $oldConsole = $session->console;
+
+            // Update status konsol (jika kolom status digunakan di database)
+            if (isset($oldConsole->status)) {
+                $oldConsole->update(['status' => 'available']); // atau 'kosong' sesuai konvensi DB kamu
+            }
+            
+            if (isset($newConsole->status)) {
+                $newConsole->update(['status' => 'occupied']); // atau 'dipakai'
+            }
+
+            // Pindahkan ID konsol pada sesi rental yang berjalan
+            $session->update([
+                'console_id' => $newConsole->id,
+            ]);
+        });
+
+        return redirect()->back()->with('success', "Sesi berhasil dipindahkan dari {$session->console->name} ke {$newConsole->name}!");
     }
 }

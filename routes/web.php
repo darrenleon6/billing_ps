@@ -26,6 +26,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/shift/start', [ShiftController::class, 'start'])->name('shift.start');
         Route::post('/shift/{shift}/stop', [ShiftController::class, 'stop'])->name('shift.stop');
         Route::get('/reports/shifts', [ShiftController::class, 'index'])->name('reports.shifts');
+        Route::get('/reports/transactions', [ReportController::class, 'index'])->name('reports.transactions');
+        Route::post('/rental-sessions/{id}/transfer', [RentalController::class, 'transferConsole'])->name('rental.transfer');
 
    
     });
@@ -33,7 +35,6 @@ Route::middleware(['auth'])->group(function () {
     // 2. KHUSUS AKSES ADMIN (Stok, Laporan Transaksi, & Analytics)
     Route::middleware(['role:admin'])->group(function () {
         Route::resource('products', ProductController::class)->except(['create', 'edit', 'show']);
-        Route::get('/reports/transactions', [ReportController::class, 'index'])->name('reports.transactions');
         Route::get('/analytics', [AnalyticsController::class, 'index'])->name('reports.analytics');
     });
 

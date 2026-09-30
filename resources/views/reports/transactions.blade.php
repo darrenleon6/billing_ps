@@ -15,7 +15,13 @@
         {{-- Header Halaman --}}
         <div>
             <h1 class="text-xl font-bold text-gray-800">Laporan Transaksi & Keuangan</h1>
-            <p class="text-xs text-gray-500">Rekap riwayat penyewaan PS dan penjualan FnB</p>
+            <p class="text-xs text-gray-500">
+                @if(auth()->user()->role === 'admin')
+                    Rekap riwayat penyewaan PS dan penjualan FnB
+                @else
+                    Rekap transaksi harian untuk sesi kasir/operator
+                @endif
+            </p>
         </div>
 
         {{-- Container Alert Error Frontend --}}
@@ -27,98 +33,116 @@
         <div class="space-y-4 mb-6">
             
             {{-- BARIS 1: PENDAPATAN UTAMA (HIGHLIGHT) --}}
-            {{-- BARIS 1: PENDAPATAN UTAMA (HIGHLIGHT) --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {{-- Total Pendapatan Keseluruhan --}}
-            <div class="bg-gradient-to-r from-slate-900 to-indigo-900 p-5 rounded-2xl shadow-sm text-white flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-indigo-200 uppercase tracking-wider">Total Pendapatan Keseluruhan</p>
-                    <h3 class="text-2xl font-black text-white mt-1">Rp {{ number_format($grandTotal, 0, ',', '.') }}</h3>
-                    <p class="text-[11px] text-indigo-300 mt-1">Sewa PS + Omset FnB Kotor</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {{-- Total Pendapatan Keseluruhan --}}
+                <div class="bg-gradient-to-r from-slate-900 to-indigo-900 p-5 rounded-2xl shadow-sm text-white flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-indigo-200 uppercase tracking-wider">Total Pendapatan Keseluruhan</p>
+                        <h3 class="text-2xl font-black text-white mt-1">Rp {{ number_format($grandTotal, 0, ',', '.') }}</h3>
+                        <p class="text-[11px] text-indigo-300 mt-1">Sewa PS + Omset FnB Kotor</p>
+                    </div>
+                    <div class="w-14 h-14 flex-none bg-white/10 rounded-xl border border-white/10 flex flex-col items-center justify-center text-3xl">
+                        <span class="pb-1">💵</span>
+                    </div>
                 </div>
-                {{-- 🟢 Menggunakan w-14 h-14 agar kotak lebih proporsional dengan teks 2xl --}}
-                <div class="w-14 h-14 flex-none bg-white/10 rounded-xl border border-white/10 flex flex-col items-center justify-center text-3xl">
-                    {{-- 🟢 Span dengan padding-bottom untuk mengangkat ikon secara paksa --}}
-                    <span class="pb-1">💵</span>
+
+                {{-- Pendapatan Rental PS --}}
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Pendapatan Rental PS</p>
+                        <h3 class="text-2xl font-bold text-gray-800 mt-1">Rp {{ number_format($totalRental, 0, ',', '.') }}</h3>
+                        <p class="text-[11px] text-gray-400 mt-1">Murni dari biaya sewa konsol</p>
+                    </div>
+                    <div class="w-14 h-14 flex-none bg-indigo-50 text-indigo-600 rounded-xl flex flex-col items-center justify-center text-3xl">
+                        <span class="pb-1">🎮</span>
+                    </div>
                 </div>
             </div>
 
-            {{-- Pendapatan Rental PS --}}
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Pendapatan Rental PS</p>
-                    <h3 class="text-2xl font-bold text-gray-800 mt-1">Rp {{ number_format($totalRental, 0, ',', '.') }}</h3>
-                    <p class="text-[11px] text-gray-400 mt-1">Murni dari biaya sewa konsol</p>
-                </div>
-                <div class="w-14 h-14 flex-none bg-indigo-50 text-indigo-600 rounded-xl flex flex-col items-center justify-center text-3xl">
-                    {{-- 🟢 Span dengan padding-bottom untuk mengangkat ikon secara paksa --}}
-                    <span class="pb-1">🎮</span>
-                </div>
-            </div>
-        </div>
+            {{-- BARIS 2: RINCIAN PERFORMA FNB --}}
+            @if(auth()->user()->role === 'admin')
+                {{-- TAMPILAN ADMIN (3 KARTU: OMSET, HPP, PROFIT) --}}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {{-- Omset FnB Kotor --}}
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Omset FnB (Kotor)</p>
+                            <h4 class="text-lg font-bold text-blue-600 mt-0.5">Rp {{ number_format($fnbRevenue, 0, ',', '.') }}</h4>
+                        </div>
+                        <div class="w-10 h-10 flex-none bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-2xl">
+                            🍿
+                        </div>
+                    </div>
 
-           {{-- BARIS 2: RINCIAN PERFORMA FNB (OMSET, MODAL, PROFIT) --}}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {{-- Omset FnB Kotor --}}
+                    {{-- Modal FnB (HPP) --}}
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Modal FnB (HPP)</p>
+                            <h4 class="text-lg font-bold text-amber-600 mt-0.5">Rp {{ number_format($fnbHPP, 0, ',', '.') }}</h4>
+                        </div>
+                        <div class="w-10 h-10 flex-none bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-2xl">
+                            📦
+                        </div>
+                    </div>
+
+                    {{-- Laba Bersih FnB (Profit) --}}
+                    <div class="bg-emerald-50/60 p-4 rounded-xl shadow-sm border border-emerald-200/80 flex items-center justify-between">
+                        <div>
+                            <p class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Laba Bersih FnB (Profit)</p>
+                            <h4 class="text-lg font-extrabold text-emerald-600 mt-0.5">Rp {{ number_format($fnbProfit, 0, ',', '.') }}</h4>
+                        </div>
+                        <div class="w-10 h-10 flex-none bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center text-2xl">
+                            💰
+                        </div>
+                    </div>
+                </div>
+            @else
+                {{-- TAMPILAN OPERATOR (HANYA OMSET FNB KOTOR) --}}
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
                     <div>
-                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Omset FnB (Kotor)</p>
+                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Omset FnB</p>
                         <h4 class="text-lg font-bold text-blue-600 mt-0.5">Rp {{ number_format($fnbRevenue, 0, ',', '.') }}</h4>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Total penjualan makanan/minuman hari ini</p>
                     </div>
                     <div class="w-10 h-10 flex-none bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-2xl">
                         🍿
                     </div>
                 </div>
+            @endif
 
-                {{-- Modal FnB (HPP) --}}
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
-                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Modal FnB (HPP)</p>
-                        <h4 class="text-lg font-bold text-amber-600 mt-0.5">Rp {{ number_format($fnbHPP, 0, ',', '.') }}</h4>
+        {{-- FORM FILTER TANGGAL (HANYA MUNCUL UNTUK ADMIN) --}}
+        @if(auth()->user()->role === 'admin')
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <form action="{{ route('reports.transactions') }}" method="GET" onsubmit="return validateDateFilter(event)" class="flex flex-wrap items-center gap-4 text-xs">
+                    <div class="flex items-center gap-2">
+                        <label class="text-gray-600 font-semibold">Dari Tanggal:</label>
+                        <input type="date" id="start_date" name="start_date" value="{{ request('start_date', $startDate) }}" required
+                               class="border border-gray-300 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 text-xs">
                     </div>
-                    <div class="w-10 h-10 flex-none bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-2xl">
-                        📦
+                    <div class="flex items-center gap-2">
+                        <label class="text-gray-600 font-semibold">Sampai Tanggal:</label>
+                        <input type="date" id="end_date" name="end_date" value="{{ request('end_date', $endDate) }}" required
+                               class="border border-gray-300 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 text-xs">
                     </div>
-                </div>
-
-                {{-- Laba Bersih FnB (Profit) --}}
-                <div class="bg-emerald-50/60 p-4 rounded-xl shadow-sm border border-emerald-200/80 flex items-center justify-between">
-                    <div>
-                        <p class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Laba Bersih FnB (Profit)</p>
-                        <h4 class="text-lg font-extrabold text-emerald-600 mt-0.5">Rp {{ number_format($fnbProfit, 0, ',', '.') }}</h4>
+                    <div class="flex items-center gap-2">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg transition">
+                            Filter
+                        </button>
+                        @if(request('start_date') || request('end_date'))
+                            <a href="{{ route('reports.transactions') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition">
+                                Reset
+                            </a>
+                        @endif
                     </div>
-                    <div class="w-10 h-10 flex-none bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center text-2xl">
-                        💰
-                    </div>
-                </div>
+                </form>
             </div>
-
-
-        {{-- Form Filter Tanggal --}}
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-            <form action="{{ route('reports.transactions') }}" method="GET" onsubmit="return validateDateFilter(event)" class="flex flex-wrap items-center gap-4 text-xs">
-                <div class="flex items-center gap-2">
-                    <label class="text-gray-600 font-semibold">Dari Tanggal:</label>
-                    <input type="date" id="start_date" name="start_date" value="{{ request('start_date') }}" required
-                           class="border border-gray-300 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 text-xs">
-                </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-gray-600 font-semibold">Sampai Tanggal:</label>
-                    <input type="date" id="end_date" name="end_date" value="{{ request('end_date') }}" required
-                           class="border border-gray-300 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 text-xs">
-                </div>
-                <div class="flex items-center gap-2">
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg transition">
-                        Filter
-                    </button>
-                    @if(request('start_date') || request('end_date'))
-                        <a href="{{ route('reports.transactions') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition">
-                            Reset
-                        </a>
-                    @endif
-                </div>
-            </form>
-        </div>
+        @else
+            {{-- INFORMASI LAPORAN HARIAN UNTUK OPERATOR --}}
+            <div class="bg-indigo-50 border border-indigo-200 text-indigo-900 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
+                <span class="text-base">ℹ️</span>
+                <span>Menampilkan ringkasan transaksi <strong>Hari Ini ({{ \Carbon\Carbon::today()->format('d M Y') }})</strong>.</span>
+            </div>
+        @endif
 
         {{-- Tabel Riwayat Transaksi --}}
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -163,7 +187,7 @@
                         @empty
                         <tr>
                             <td colspan="5" class="p-4 text-center text-gray-500 italic">
-                                Belum ada riwayat transaksi yang sesuai dengan filter.
+                                Belum ada riwayat transaksi yang sesuai.
                             </td>
                         </tr>
                         @endforelse
@@ -174,37 +198,35 @@
 
     </div>
 
-    {{-- Script Validasi Frontend --}}
-    <script>
-        function validateDateFilter(event) {
-            const startDate = document.getElementById('start_date').value;
-            const endDate = document.getElementById('end_date').value;
-            const alertBox = document.getElementById('frontendAlert');
-            const alertMsg = document.getElementById('alertMessage');
+    {{-- Script Validasi Frontend (Hanya aktif untuk Admin) --}}
+    @if(auth()->user()->role === 'admin')
+        <script>
+            function validateDateFilter(event) {
+                const startDate = document.getElementById('start_date').value;
+                const endDate = document.getElementById('end_date').value;
+                const alertBox = document.getElementById('frontendAlert');
+                const alertMsg = document.getElementById('alertMessage');
 
-            // Reset pesan error
-            alertBox.classList.add('hidden');
+                alertBox.classList.add('hidden');
 
-            // 1. Cek apakah kedua tanggal sudah diisi
-            if (!startDate || !endDate) {
-                event.preventDefault();
-                alertMsg.innerText = '⚠️ Kedua tanggal (Dari Tanggal & Sampai Tanggal) wajib diisi!';
-                alertBox.classList.remove('hidden');
-                return false;
+                if (!startDate || !endDate) {
+                    event.preventDefault();
+                    alertMsg.innerText = '⚠️ Kedua tanggal (Dari Tanggal & Sampai Tanggal) wajib diisi!';
+                    alertBox.classList.remove('hidden');
+                    return false;
+                }
+
+                if (startDate > endDate) {
+                    event.preventDefault();
+                    alertMsg.innerText = '⚠️ "Dari Tanggal" tidak boleh lebih besar dari "Sampai Tanggal"!';
+                    alertBox.classList.remove('hidden');
+                    return false;
+                }
+
+                return true;
             }
+        </script>
+    @endif
 
-            // 2. Cek apakah start_date > end_date
-            if (startDate > endDate) {
-                event.preventDefault();
-                alertMsg.innerText = '⚠️ "Dari Tanggal" tidak boleh lebih besar dari "Sampai Tanggal"!';
-                alertBox.classList.remove('hidden');
-                return false;
-            }
-
-            return true;
-        }
-    </script>
-
-    
 </body>
 </html>
