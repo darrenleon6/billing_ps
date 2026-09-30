@@ -18,25 +18,26 @@ class PackageSeeder extends Seeder
         Package::create([
             'name' => 'Paket 1 Jam',
             'duration_minutes' => 60,
-            'price' => 12000,
+            'price' => 8000,
         ]);
 
         Package::create([
             'name' => 'Paket 2 Jam',
             'duration_minutes' => 120,
-            'price' => 22000,
+            'price' => 16000,
         ]);
 
         Package::create([
             'name' => 'Paket 3 Jam',
             'duration_minutes' => 180,
-            'price' => 30000,
+            'price' => 24000,
         ]);
 
         Package::create([
-            'name' => 'Paket Begadang (5 Jam)',
-            'duration_minutes' => 300,
-            'price' => 45000,
+            'name' => 'Paket 4 Jam',
+            'duration_minutes' => 240,
+            'price' => 32000,
         ]);
+
     }
 }

@@ -31,6 +31,54 @@ class RentalSeeder extends Seeder
             'hourly_rate' => 8000,
             'status' => 'ready',
         ]);
+        Console::create([
+            'name' => 'PS4 - Unit 04',
+            'type' => 'PS4',
+            'hourly_rate' => 8000,
+            'status' => 'ready',
+        ]);
+        Console::create([
+            'name' => 'PS4 - Unit 05',
+            'type' => 'PS4',
+            'hourly_rate' => 8000,
+            'status' => 'ready',
+        ]);
+        Console::create([
+            'name' => 'PS4 - Unit 06',
+            'type' => 'PS4',
+            'hourly_rate' => 8000,
+            'status' => 'ready',
+        ]);
+        Console::create([
+            'name' => 'PS4 - Unit 07',
+            'type' => 'PS4',
+            'hourly_rate' => 8000,
+            'status' => 'ready',
+        ]);
+        Console::create([
+            'name' => 'PS4 - Unit 08',
+            'type' => 'PS4',
+            'hourly_rate' => 8000,
+            'status' => 'ready',
+        ]);
+        Console::create([
+            'name' => 'PS4 - Unit 09',
+            'type' => 'PS4',
+            'hourly_rate' => 8000,
+            'status' => 'ready',
+        ]);
+        Console::create([
+            'name' => 'PS4 - Unit 10',
+            'type' => 'PS4',
+            'hourly_rate' => 8000,
+            'status' => 'ready',
+        ]);
+        Console::create([
+            'name' => 'PS4 - Unit 11',
+            'type' => 'PS4',
+            'hourly_rate' => 8000,
+            'status' => 'ready',
+        ]);
 
         // 2. Data Produk FnB
         Product::create([

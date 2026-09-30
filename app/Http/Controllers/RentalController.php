@@ -22,7 +22,7 @@ class RentalController extends Controller
         // 1. Ambil semua console beserta sesi aktif
         $consoles = Console::with(['sessions' => function ($query) {
             $query->where('status', 'active')->with(['orders.product', 'package']);
-        }])->orderBy('id', 'asc')->get();
+        }])->orderBy('name', 'asc')->get();
 
         // 2. Ambil produk FnB & Paket
         $products = Product::orderBy('name', 'asc')->get();
@@ -112,7 +112,8 @@ class RentalController extends Controller
                 $appliedPromoId = $promo->id;
             }
         }
-
+        $console = Console::findOrFail($request->console_id);
+        $console->update(['status' => 'active']);
         // 🟢 4. Simpan Sesi Rental Baru
         RentalSession::create([
             'console_id'       => $request->console_id,
@@ -273,6 +274,8 @@ class RentalController extends Controller
             'qris_amount'     => $qrisAmount,
             'status'          => 'completed',
         ]);
+
+        $session->console->update(['status' => 'ready']);
 
         // Kembalikan ke dashboard dengan membawa ID sesi yang baru di-stop
         return redirect()->back()->with([

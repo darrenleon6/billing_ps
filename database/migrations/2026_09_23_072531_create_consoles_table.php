@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name'); //contoh PS4 - 01
             $table->string('type'); //contoh PS4/PS5
             $table->decimal('hourly_rate', 12,2); //tarif per jam
-            $table->string('status')->default('ready'); // ready / in_use /maintenance
+            $table->string('status')->default('ready'); // ready
             $table->timestamps();
         });
     }

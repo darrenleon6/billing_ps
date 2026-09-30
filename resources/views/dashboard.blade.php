@@ -10,8 +10,7 @@
 
 @include('layouts.navigation')
 
-    <div class="container mx-auto p-6">
-        <h1 class="text-3xl font-bold mb-6 text-indigo-700">🎮 Dashboard Billing Rental PS</h1>
+    <div class="max-w-7xl mx-auto px-2 pt-4">
 
         @if(!$activeShift)
         {{-- MODAL BUKA SHIFT (Jika belum Buka Shift) --}}
@@ -72,23 +71,39 @@
                     $activeSession = $console->sessions->first();
                 @endphp
 
-                {{-- 🟢 Mengunci tinggi kartu kaku (h-[520px]) dan flex-col agar seragam --}}
-                <div class="bg-white rounded-xl shadow-md overflow-hidden border-2 flex flex-col h-[520px] {{ $activeSession ? 'border-red-400 bg-red-50/10' : 'border-green-400 bg-green-50/10' }}">
-                    
-                    {{-- HEADER KARTU CONSOLE --}}
-                    <div class="p-4 flex-none flex justify-between items-center {{ $activeSession ? 'bg-red-500 text-white' : 'bg-green-600 text-white' }}">
-                        <div>
-                            <h2 class="font-bold text-lg leading-tight">{{ $console->name }}</h2>
-                            <p class="text-xs opacity-90">Rp {{ number_format($console->hourly_rate, 0, ',', '.') }}/jam</p>
-                        </div>
-                        <span class="text-xs font-extrabold px-2 py-1 rounded bg-white/20 uppercase tracking-wider">
-                            {{ $activeSession ? 'DIPAKAI' : 'KOSONG' }}
-                        </span>
-                    </div>
+                {{-- WADAH KARTU CONSOLE --}}
+        <div class="bg-white rounded-xl shadow-md overflow-hidden border-2 flex flex-col h-[520px] {{ $console->status === 'maintenance' ? 'border-amber-400 bg-amber-50/20' : ($activeSession ? 'border-red-500' : 'border-gray-200') }}">
+
+            {{-- HEADER KARTU CONSOLE --}}
+            <div class="p-4 flex-none flex justify-between items-center {{ $console->status === 'maintenance' ? 'bg-amber-500 text-white' : ($activeSession ? 'bg-red-500 text-white' : 'bg-green-600 text-white') }}">
+                <div>
+                    <h2 class="font-bold text-lg leading-tight">{{ $console->name }}</h2>
+                    <p class="text-xs opacity-90">Rp {{ number_format($console->hourly_rate, 0, ',', '.') }}/jam</p>
+                </div>
+                <span class="text-xs font-extrabold px-2 py-1 rounded bg-white/20 uppercase tracking-wider">
+                    @if($console->status === 'maintenance')
+                        MAINTENANCE
+                    @else
+                        {{ $activeSession ? 'DIPAKAI' : 'KOSONG' }}
+                    @endif
+                </span>
+            </div>
 
                     {{-- BODY KARTU (Mengisi ruang sisa & mengatur tata letak internal) --}}
                     <div class="p-4 flex-1 flex flex-col justify-between overflow-hidden">
-                        @if(!$activeSession)
+                        {{-- 🔴 KONDISI 1: UNIT MAINTENANCE --}}
+                        @if($console->status === 'maintenance')
+                            <div class="flex-1 flex flex-col items-center justify-center text-center p-4">
+                                <div class="my-auto py-6 px-4 border-2 border-dashed border-red-200 rounded-2xl bg-red-50/50 w-full">
+                                    <span class="text-4xl block mb-2">🛠️</span>
+                                    <p class="text-xs font-bold text-red-600 uppercase tracking-wide">Unit Nonaktif</p>
+                                    <p class="text-[11px] text-gray-500 mt-1">Sedang dalam perbaikan / perawatan</p>
+                                </div>
+                            </div>
+                            <button disabled type="button" class="w-full bg-gray-200 text-gray-400 font-bold py-2.5 rounded-xl text-xs cursor-not-allowed shadow-none">
+                                🚫 Maintenance
+                            </button>
+                        @elseif(!$activeSession)
                             {{-- FORM MULAI RENTAL --}}
                             <form action="{{ route('rental.start') }}" method="POST" class="flex-1 flex flex-col justify-between">
                                 @csrf

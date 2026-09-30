@@ -2,9 +2,21 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Package extends Model
 {
-    //
+    use HasFactory;
+
+    protected $fillable = [
+        'name',
+        'duration_minutes',
+        'price',
+    ];
+
+    public function sessions()
+    {
+        return $this->hasMany(RentalSession::class);
+    }
 }
