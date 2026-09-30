@@ -12,9 +12,11 @@ use Carbon\Carbon;
 use App\Models\Shift; // 🟢 Jangan lupa import model Shift di bagian atas controller
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Models\Promotion; // 👈 Pastikan import Model Promotion ditaruh di paling atas file
 
 class RentalController extends Controller
 {
+
     public function index()
     {
         // 1. Ambil semua console beserta sesi aktif
@@ -27,20 +29,29 @@ class RentalController extends Controller
         $packages = Package::all();
 
         // 🟢 3. Ambil daftar konsol yang kosong (available) untuk Modal Pindah Konsol
-        // Ambil konsol yang TIDAK SEDANG MEMILIKI sesi aktif saat ini
         $availableConsoles = Console::whereDoesntHave('sessions', function ($query) {
             $query->where('status', 'active');
         })->orderBy('name', 'asc')->get();
 
-        // 4. Cek apakah ada request cetak/tampil struk
+        // 🟢 4. Ambil daftar promo yang sedang AKTIF untuk dipilihi operator
+        $promotions = Promotion::where('is_active', true)->orderBy('name', 'asc')->get();
+
+        // 5. Cek apakah ada request cetak/tampil struk
         $receiptSession = null;
         if (session('show_receipt_id')) {
-            $receiptSession = RentalSession::with(['console', 'package', 'orders.product'])
+            $receiptSession = RentalSession::with(['console', 'package', 'orders.product', 'promotion'])
                 ->find(session('show_receipt_id'));
         }
 
-        // 🟢 5. Masukkan 'availableConsoles' ke dalam compact()
-        return view('dashboard', compact('consoles', 'products', 'packages', 'receiptSession', 'availableConsoles'));
+        // 🟢 6. Masukkan 'promotions' ke dalam compact()
+        return view('dashboard', compact(
+            'consoles', 
+            'products', 
+            'packages', 
+            'receiptSession', 
+            'availableConsoles', 
+            'promotions'
+        ));
     }
 
     public function startSession(Request $request)
@@ -54,10 +65,12 @@ class RentalController extends Controller
             return redirect()->back()->with('error', 'Gagal memulai rental! Kamu harus Buka Shift terlebih dahulu.');
         }
 
+        // 🟢 2. Validasi Input (termasuk promotion_id)
         $request->validate([
-            'console_id' => 'required|exists:consoles,id',
-            'type' => 'required|in:open,package',
-            'package_id' => 'nullable|required_if:type,package|exists:packages,id',
+            'console_id'   => 'required|exists:consoles,id',
+            'type'         => 'required|in:open,package',
+            'package_id'   => 'nullable|required_if:type,package|exists:packages,id',
+            'promotion_id' => 'nullable|exists:promotions,id',
         ]);
 
         // Pastikan tidak ada sesi aktif di console yang sama
@@ -69,35 +82,74 @@ class RentalController extends Controller
             return redirect()->back()->with('error', 'Console ini sedang aktif digunakan!');
         }
 
+        // 🟢 3. Logika Pengecekan & Pengaplikasian Promo Bonus Waktu
+        $bonusMinutes = 0;
+        $appliedPromoId = null;
+
+        if ($request->filled('promotion_id')) {
+            $promo = \App\Models\Promotion::find($request->promotion_id);
+
+            if ($promo && $promo->is_active && $promo->type === 'bonus_time') {
+                // Hitung durasi dasar (jika memilih paket)
+                $baseDuration = 0;
+                if ($request->type === 'package' && $request->filled('package_id')) {
+                    $package = \App\Models\Package::find($request->package_id);
+                    $baseDuration = $package ? $package->duration_minutes : 0;
+                }
+
+                // Validasi Syarat Minimal Durasi Sewa Promo
+                if ($promo->min_duration_minutes > 0 && $baseDuration < $promo->min_duration_minutes) {
+                    return redirect()->back()->with('error', "Gagal menerapkan promo! Promo '{$promo->name}' membutuhkan minimal pilihan paket {$promo->min_duration_minutes} menit.");
+                }
+
+                // Cek tanggal berlaku promo
+                $today = now()->toDateString();
+                if (($promo->start_date && $today < $promo->start_date) || ($promo->end_date && $today > $promo->end_date)) {
+                    return redirect()->back()->with('error', 'Gagal menerapkan promo! Masa berlaku promo ini telah berakhir.');
+                }
+
+                $bonusMinutes = $promo->bonus_minutes;
+                $appliedPromoId = $promo->id;
+            }
+        }
+
+        // 🟢 4. Simpan Sesi Rental Baru
         RentalSession::create([
-            'console_id' => $request->console_id,
-            'user_id'    => Auth::id(),        // 🟢 Catat siapa kasir yang melayani
-            'shift_id'   => $activeShift->id,  // 🟢 KUNCI DI SINI: Kaitkan transaksi ke Shift Aktif
-            'package_id' => $request->type === 'package' ? $request->package_id : null,
-            'type'       => $request->type,
-            'start_time' => Carbon::now(),
-            'status'     => 'active',
+            'console_id'       => $request->console_id,
+            'user_id'          => Auth::id(),        // Catat kasir yang melayani
+            'shift_id'         => $activeShift->id,  // Kaitkan ke Shift Aktif
+            'package_id'       => $request->type === 'package' ? $request->package_id : null,
+            'promotion_id'     => $appliedPromoId,   // 👈 Simpan ID promo bonus waktu jika ada
+            'extended_minutes' => $bonusMinutes,     // 👈 Masukkan bonus menit langsung ke extended_minutes agar timer otomatis bertambah
+            'type'             => $request->type,
+            'start_time'       => Carbon::now(),
+            'status'           => 'active',
         ]);
 
-        return redirect()->back()->with('success', 'Sesi rental berhasil dimulai!');
-    }
+        $successMessage = 'Sesi rental berhasil dimulai!';
+        if ($bonusMinutes > 0) {
+            $successMessage .= " (Bonus promo +{$bonusMinutes} menit berhasil diterapkan)";
+        }
 
+        return redirect()->back()->with('success', $successMessage);
+    }
     public function stopSession(Request $request, $id)
     {
-        // 0. 🛑 VALIDASI SHIFT: Pastikan kasir memiliki Shift Aktif yang sedang terbuka
+        // 0. VALIDASI SHIFT: Pastikan kasir memiliki Shift Aktif yang sedang terbuka
         $activeShift = \App\Models\Shift::where('user_id', Auth::id())
             ->where('status', 'open')
             ->first();
 
         if (!$activeShift) {
-            return redirect()->back()->with('error', 'Transaksi gagal! Kamu harus membuka Shift terlebih dahulu sebelum menghentikan sesi dan menerima pembayaran.');
+            return redirect()->back()->with('error', 'Transaksi gagal! Kamu harus membuka Shift terlebih dahulu sebelum menghentikan sesi.');
         }
 
-        // 1. Validasi input metode pembayaran (ditambahkan opsi 'split')
+        // 1. Validasi input metode pembayaran & promo
         $request->validate([
             'payment_method' => ['required', 'string', 'in:cash,qris,split'],
             'cash_amount'    => ['required_if:payment_method,split', 'nullable', 'numeric', 'min:0'],
             'qris_amount'    => ['required_if:payment_method,split', 'nullable', 'numeric', 'min:0'],
+            'promotion_id'   => ['nullable', 'exists:promotions,id'], // 👈 Validasi promo
         ]);
 
         $session = RentalSession::with(['console', 'package', 'orders'])->findOrFail($id);
@@ -112,7 +164,7 @@ class RentalController extends Controller
         if ($session->type === 'package' && $session->package) {
             // 1. Biaya awal paket
             $rentalCost = $session->package->price;
-            
+
             // 2. Tambahkan biaya dari perpanjangan paket (jika ada)
             $rentalCost += $session->extended_cost;
 
@@ -133,9 +185,58 @@ class RentalController extends Controller
             $rentalCost = $billableBlocks * $ratePerBlock;
         }
 
-        // --- Hitung Total FnB & Grand Total ---
+        // --- Hitung Total FnB & Gross Total ---
         $fnbCost = $session->orders->sum('subtotal');
-        $grandTotal = $rentalCost + $fnbCost;
+        $grossTotal = $rentalCost + $fnbCost;
+
+        // --- 🟢 PERHITUNGAN DURASI UNTUK SYARAT PROMO ---
+        // Jika tipe paket, gunakan durasi resmi paket (+ perpanjangan jika ada).
+        // Jika Open Play, gunakan durasi riil berjalan ($totalMinutes).
+        $effectiveDurationForPromo = $totalMinutes;
+
+        if ($session->type === 'package' && $session->package) {
+            $packageDuration = $session->package->duration_minutes + $session->extended_minutes;
+            // Gunakan durasi mana yang lebih besar (durasi paket atau durasi riil jika overtime)
+            $effectiveDurationForPromo = max($packageDuration, $totalMinutes);
+        }
+
+        // --- LOGIKA PENGECEKAN & APLIKASI PROMO ---
+        $discountAmount = 0;
+        $appliedPromoId = null;
+
+        if ($request->filled('promotion_id')) {
+            $promo = \App\Models\Promotion::find($request->promotion_id);
+
+            if ($promo && $promo->is_active) {
+                // 1. Cek Masa Berlaku Tanggal Promo
+                $today = now()->toDateString();
+                if (($promo->start_date && $today < $promo->start_date) || ($promo->end_date && $today > $promo->end_date)) {
+                    return redirect()->back()->with('error', 'Transaksi gagal! Promo yang dipilih sudah kadaluarsa.');
+                }
+
+                // 2. Syarat Minimal Durasi Sewa
+                if ($promo->min_duration_minutes > 0 && $effectiveDurationForPromo < $promo->min_duration_minutes) {
+                    return redirect()->back()->with('error', "Transaksi gagal! Promo ini membutuhkan minimal durasi sewa {$promo->min_duration_minutes} menit (Durasi sesi ini: {$effectiveDurationForPromo} mnt).");
+                }
+
+                // 3. Syarat Minimal Total Transaksi (Mengecek Gross Total Sewa + FnB)
+                if ($promo->min_transaction_amount > 0 && $grossTotal < $promo->min_transaction_amount) {
+                    return redirect()->back()->with('error', "Transaksi gagal! Promo ini membutuhkan minimal transaksi Rp " . number_format($promo->min_transaction_amount, 0, ',', '.') . " (Total transaksi saat ini: Rp " . number_format($grossTotal, 0, ',', '.') . ").");
+                }
+
+                // Hitung Potongan
+                $appliedPromoId = $promo->id;
+                if ($promo->type === 'discount_nominal') {
+                    $discountAmount = $promo->discount_value;
+                } elseif ($promo->type === 'discount_percent') {
+                    $discountAmount = ($promo->discount_value / 100) * $grossTotal;
+                } elseif ($promo->type === 'bonus_time') {
+                    $discountAmount = 0; 
+                }
+            }
+        }
+        // Total Tagihan Akhir setelah dipotong Diskon
+        $grandTotal = max(0, $grossTotal - $discountAmount);
 
         // --- Pembagian Nominal Cash & QRIS (Split Payment) ---
         $paymentMethod = $request->payment_method;
@@ -154,27 +255,29 @@ class RentalController extends Controller
 
             // Validasi: Jumlah gabungan Cash + QRIS tidak boleh kurang dari Total Biaya
             if (($cashAmount + $qrisAmount) < $grandTotal) {
-                return redirect()->back()->with('error', 'Jumlah pembayaran (Cash + QRIS) kurang dari total tagihan (Rp ' . number_format($grandTotal, 0, ',', '.') . ')!');
+                return redirect()->back()->with('error', 'Jumlah pembayaran (Cash + QRIS) kurang dari total tagihan (Rp ' . number_format($grandTotal, 0, ',', '.') . ')');
             }
         }
 
         // --- Simpan Perubahan Sesi Rental ---
         $session->update([
-            'shift_id'       => $activeShift->id, // 🟢 Mengikat transaksi ke Shift Aktif kasir saat ini
-            'end_time'       => $endTime,
-            'rental_cost'    => $rentalCost,
-            'fnb_cost'       => $fnbCost,
-            'total_cost'     => $grandTotal,
-            'payment_method' => $paymentMethod,
-            'cash_amount'    => $cashAmount,
-            'qris_amount'    => $qrisAmount,
-            'status'         => 'completed',
+            'shift_id'        => $activeShift->id,
+            'end_time'        => $endTime,
+            'rental_cost'     => $rentalCost,
+            'fnb_cost'        => $fnbCost,
+            'promotion_id'    => $appliedPromoId,   // 👈 Simpan ID promo yang digunakan
+            'discount_amount' => $discountAmount,  // 👈 Simpan nominal potongan harga
+            'total_cost'      => $grandTotal,       // Total bersih setelah diskon
+            'payment_method'  => $paymentMethod,
+            'cash_amount'     => $cashAmount,
+            'qris_amount'     => $qrisAmount,
+            'status'          => 'completed',
         ]);
 
         // Kembalikan ke dashboard dengan membawa ID sesi yang baru di-stop
         return redirect()->back()->with([
-            'success'         => 'Sesi rental berhasil diselesaikan!',
-            'show_receipt_id' => $session->id
+            'success'          => 'Sesi rental berhasil diselesaikan!',
+            'show_receipt_id' => $session->id,
         ]);
     }
     public function addOrder(Request $request, $sessionId)

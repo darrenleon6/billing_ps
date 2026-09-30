@@ -36,10 +36,14 @@
                         Stok & Produk
                     </a>
 
-
                     <a href="{{ route('reports.analytics') }}" 
                     class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('reports.analytics') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
                         Statistik
+                    </a>
+
+                    <a href="{{ route('promotions.index') }}" 
+                    class="px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors {{ request()->routeIs('promotions.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        Promo & Diskon
                     </a>
                 @endif
 

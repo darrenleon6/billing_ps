@@ -6,6 +6,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ShiftController; // 🟢 Tambahkan baris ini di paling atas routes/web.php
+use App\Http\Controllers\PromotionController; 
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -36,6 +37,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:admin'])->group(function () {
         Route::resource('products', ProductController::class)->except(['create', 'edit', 'show']);
         Route::get('/analytics', [AnalyticsController::class, 'index'])->name('reports.analytics');
+        Route::resource('promotions', PromotionController::class)->except(['create', 'edit', 'show']);
     });
 
 });

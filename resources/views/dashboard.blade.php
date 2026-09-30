@@ -96,7 +96,7 @@
 
                                 <div class="space-y-3">
                                     <div>
-                                        <label class="block text-xs font-semibold text-gray-600 mb-1">Mode Main</label>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">Mode Main</label>
                                         <select name="type" id="type_select_{{ $console->id }}" 
                                                 onchange="togglePackageDropdown('{{ $console->id }}')" 
                                                 class="w-full text-sm border rounded-lg p-2 focus:ring focus:ring-indigo-200" required>
@@ -107,7 +107,7 @@
 
                                     {{-- Dropdown Paket --}}
                                     <div id="package_container_{{ $console->id }}" class="hidden">
-                                        <label class="block text-xs font-semibold text-gray-600 mb-1">Pilih Paket</label>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">Pilih Paket</label>
                                         <select name="package_id" class="w-full text-sm border rounded-lg p-2 focus:ring focus:ring-indigo-200">
                                             @foreach($packages as $package)
                                                 <option value="{{ $package->id }}">
@@ -116,6 +116,19 @@
                                             @endforeach
                                         </select>
                                     </div>
+                                </div>
+
+                                {{-- Pilihan Promo Bonus Waktu (HANYA BONUS_TIME) --}}
+                                <div class="mt-3.5 mb-3">
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Pilih Promo Bonus Jam (Opsional):</label>
+                                    <select name="promotion_id" class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                        <option value="">-- Tanpa Promo --</option>
+                                        @foreach($promotions->where('type', 'bonus_time') as $promo)
+                                            <option value="{{ $promo->id }}">
+                                                🎉 {{ $promo->name }} (+{{ $promo->bonus_minutes }} Mnt Gratis)
+                                            </option>
+                                        @endforeach
+                                    </select>
                                 </div>
 
                                 {{-- 🟢 EMOJI PLACEHOLDER (Mengisi sisa ruang secara fleksibel & terpusat secara vertikal) --}}
@@ -304,7 +317,71 @@
                                                 </div>
                                             </div>
                                         </div>
+                                       {{-- Pilihan Promo Diskon/Potongan (HANYA NOMINAL & PERCENT) --}}
+                                        <div class="mb-4">
+                                            <label class="block text-xs font-bold text-gray-700 mb-1">Pilih Promo / Diskon (Opsional):</label>
+                                            <select name="promotion_id" id="stopPromotionSelect" onchange="calculateDiscount()" class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                                <option value="" data-type="none" data-value="0" data-min-duration="0" data-min-amount="0">-- Tanpa Promo --</option>
+                                                @foreach($promotions->whereIn('type', ['discount_nominal', 'discount_percent']) as $promo)
+                                                    <option value="{{ $promo->id }}" 
+                                                            data-type="{{ $promo->type }}" 
+                                                            data-value="{{ $promo->discount_value }}" 
+                                                            data-min-duration="{{ $promo->min_duration_minutes }}"
+                                                            data-min-amount="{{ $promo->min_transaction_amount }}">
+                                                        🎉 {{ $promo->name }} 
+                                                        @if($promo->type === 'discount_nominal')
+                                                            (Potongan Rp {{ number_format($promo->discount_value, 0, ',', '.') }})
+                                                        @elseif($promo->type === 'discount_percent')
+                                                            (Diskon {{ $promo->discount_value }}%)
+                                                        @endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <p id="promoWarning" class="text-[11px] text-red-500 font-semibold mt-1 hidden"></p>
+                                        </div>
+                                        <script>
+                                            function calculateDiscount() {
+                                            const select = document.getElementById('stopPromotionSelect');
+                                            const selectedOption = select.options[select.selectedIndex];
+                                            const warningEl = document.getElementById('promoWarning');
+                                            
+                                            if (!selectedOption || select.value === "") {
+                                                if (warningEl) warningEl.classList.add('hidden');
+                                                return;
+                                            }
 
+                                            // Ambil data atribut dari opsi promo yang dipilih
+                                            const minDuration = parseInt(selectedOption.getAttribute('data-min-duration')) || 0;
+                                            const minAmount = parseFloat(selectedOption.getAttribute('data-min-amount')) || 0;
+
+                                            // Ambil durasi & total tagihan sesi saat ini (sesuaikan dengan ID elemen di modal kamu)
+                                            const currentDuration = parseInt(document.getElementById('sessionDurationMinutes')?.value || 0);
+                                            const currentTotal = parseFloat(document.getElementById('sessionTotalAmount')?.value || 0);
+
+                                            let isEligible = true;
+                                            let errorMessage = "";
+
+                                            // Validasi syarat durasi
+                                            if (minDuration > 0 && currentDuration < minDuration) {
+                                                isEligible = false;
+                                                errorMessage = `Syarat promo ini min. durasi sewa ${minDuration} menit.`;
+                                            }
+
+                                            // Validasi syarat nominal transaksi
+                                            if (minAmount > 0 && currentTotal < minAmount) {
+                                                isEligible = false;
+                                                errorMessage = `Syarat promo ini min. transaksi Rp ${minAmount.toLocaleString('id-ID')}.`;
+                                            }
+
+                                            if (!isEligible) {
+                                                if (warningEl) {
+                                                    warningEl.innerText = `⚠️ ${errorMessage}`;
+                                                    warningEl.classList.remove('hidden');
+                                                }
+                                            } else {
+                                                if (warningEl) warningEl.classList.add('hidden');
+                                            }
+                                        }</script>
                                         @php
                                             $hasOpenShift = \App\Models\Shift::where('user_id', auth()->id())
                                                 ->where('status', 'open')
