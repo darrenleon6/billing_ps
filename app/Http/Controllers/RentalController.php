@@ -125,6 +125,7 @@ class RentalController extends Controller
             'type'             => $request->type,
             'start_time'       => Carbon::now(),
             'status'           => 'active',
+            'notes'            => $request->input('notes'),
         ]);
 
         $successMessage = 'Sesi rental berhasil dimulai!';
@@ -273,6 +274,7 @@ class RentalController extends Controller
             'cash_amount'     => $cashAmount,
             'qris_amount'     => $qrisAmount,
             'status'          => 'completed',
+            'notes'     => null,
         ]);
 
         $session->console->update(['status' => 'ready']);
@@ -378,7 +380,18 @@ class RentalController extends Controller
         return redirect()->back()->with('success', 'Paket berhasil diperpanjang!');
     }
 
-  public function transferConsole(Request $request, $id)
+    public function updateNotes(Request $request, $id)
+    {
+        $session = \App\Models\RentalSession::findOrFail($id);
+        
+        $session->update([
+            'notes' => $request->input('notes')
+        ]);
+
+        return redirect()->back()->with('success', 'Catatan berhasil diperbarui!');
+    }
+        
+    public function transferConsole(Request $request, $id)
     {
         $request->validate([
             'new_console_id' => ['required', 'exists:consoles,id'],

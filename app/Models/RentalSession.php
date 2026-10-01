@@ -27,6 +27,7 @@ class RentalSession extends Model
         'qris_amount',
         'extended_minutes',
         'extended_cost',
+        'notes',
     ];
 
     // --- RELASI KE MODEL PROMOTION ---

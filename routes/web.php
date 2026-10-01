@@ -31,6 +31,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports/shifts', [ShiftController::class, 'index'])->name('reports.shifts');
         Route::get('/reports/transactions', [ReportController::class, 'index'])->name('reports.transactions');
         Route::post('/rental-sessions/{id}/transfer', [RentalController::class, 'transferConsole'])->name('rental.transfer');
+        Route::post('/rental-sessions/{id}/notes', [RentalController::class, 'updateNotes'])->name('rental.update-notes');
 
    
     });

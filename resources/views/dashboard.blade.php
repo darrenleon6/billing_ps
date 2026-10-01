@@ -145,6 +145,12 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                {{-- Kotak Catatan Kasir --}}
+                                <div class="mb-3">
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Catatan Kasir (Opsional)</label>
+                                    <input type="text" name="notes" placeholder="Misal: Sudah bayar 15rb" 
+                                        class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-slate-50 focus:bg-white focus:outline-none">
+                                </div>
 
                                 {{-- 🟢 EMOJI PLACEHOLDER (Mengisi sisa ruang secara fleksibel & terpusat secara vertikal) --}}
                                 <div class="flex-1 my-2 flex flex-col items-center justify-center py-4 text-center border-2 border-dashed border-green-200/80 rounded-xl bg-green-50/30">
@@ -185,6 +191,7 @@
                                         <p class="text-[10px] text-gray-400 mt-1 extra-info"></p>
                                     </div>
                                 </div>
+                                
 
                                 {{-- DAFTAR ORDER FNB --}}
                                 <div class="flex-1 min-h-[90px]">
@@ -216,6 +223,7 @@
                                         <p class="text-xs text-gray-400 italic mt-1">Belum ada pesanan</p>
                                     @endif
                                 </div>
+                                
 
                                 {{-- AREA AKSI BOTTOM (FORM PERPANJANG, TAMBAH FNB & STOP) --}}
                                 <div class="flex-none pt-2 border-t space-y-2 mt-auto">
@@ -286,74 +294,95 @@
                                     @endphp
 
                                     {{-- FORM STOP RENTAL --}}
-                                    <form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="space-y-2 mt-auto">
-                                        @csrf
+<form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="space-y-2 mt-auto">
+    @csrf
 
-                                        {{-- 🟢 TOTAL TAGIHAN BERWARNA & BORDER --}}
-                                        <div class="flex justify-between items-center px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg shadow-2xs my-1.5">
-                                            <span class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Total Tagihan</span>
-                                            <span class="text-sm font-black text-slate-900">
-                                                Rp {{ number_format($grandTotal, 0, ',', '.') }}
-                                            </span>
-                                        </div>
+    {{-- 🟢 KOTAK CATATAN KASIR (DIPASANG DI SINI) --}}
+    <div class="bg-amber-50 border border-amber-300 p-2 rounded-lg text-xs space-y-1.5 my-1">
+        <div class="flex justify-between items-center">
+            <span class="font-bold text-amber-900 flex items-center gap-1">
+                <span>📝</span> Catatan Kasir:
+            </span>
+        </div>
+        
+        <div class="flex gap-1">
+            <input type="text" name="notes" value="{{ $activeSession->notes }}" placeholder="Tulis catatan / sisa bayar..." 
+                   class="w-full text-xs border border-amber-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-amber-500">
+            
+            <button type="submit" formnovalidate formaction="{{ route('rental.update-notes', $activeSession->id) }}" 
+                    class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-2.5 py-1 rounded transition text-[10px]">
+                Simpan
+            </button>
+        </div>
+    </div>
 
-                                        {{-- PILIHAN METODE PEMBAYARAN --}}
-                                        <div class="space-y-1.5" x-data="{ method: 'cash', total: {{ $grandTotal }} }">
-                                            <div class="flex items-center gap-2">
-                                                <label class="text-[11px] font-medium text-gray-600 flex-none">Metode:</label>
-                                                <select name="payment_method" 
-                                                        x-model="method" 
-                                                        onchange="document.getElementById('split-input-{{ $activeSession->id }}').style.display = (this.value === 'split') ? 'grid' : 'none'" 
-                                                        required 
-                                                        class="w-full text-xs border-gray-300 rounded-lg py-1 px-1.5">
-                                                    <option value="cash">Tunai (Full Cash)</option>
-                                                    <option value="qris">QRIS / Transfer (Full QRIS)</option>
-                                                    <option value="split">🔀 Split (Cash + QRIS)</option>
-                                                </select>
-                                            </div>
+    {{-- 🟢 TOTAL TAGIHAN BERWARNA & BORDER --}}
+    <div class="flex justify-between items-center px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg shadow-2xs my-1.5">
+        <span class="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Total Tagihan</span>
+        <span class="text-sm font-black text-slate-900">
+            Rp {{ number_format($grandTotal, 0, ',', '.') }}
+        </span>
+    </div>
 
-                                            {{-- INPUT SPLIT PAYMENT DENGAN KALKULATOR OTOMATIS --}}
-                                            <div id="split-input-{{ $activeSession->id }}" style="display: none;" class="grid-cols-2 gap-1.5 pt-1">
-                                                <div>
-                                                    <label class="text-[10px] text-gray-500 font-bold">Bayar Cash (Rp)</label>
-                                                    <input type="number" 
-                                                        name="cash_amount" 
-                                                        placeholder="0" 
-                                                        @input="$refs.qrisInput.value = Math.max(0, total - $el.value)"
-                                                        class="w-full text-xs border-gray-300 rounded-lg p-1">
-                                                </div>
-                                                <div>
-                                                    <label class="text-[10px] text-gray-500 font-bold">Bayar QRIS (Rp)</label>
-                                                    <input type="number" 
-                                                        x-ref="qrisInput"
-                                                        name="qris_amount" 
-                                                        placeholder="0" 
-                                                        class="w-full text-xs border-gray-300 rounded-lg p-1">
-                                                </div>
-                                            </div>
-                                        </div>
-                                       {{-- Pilihan Promo Diskon/Potongan (HANYA NOMINAL & PERCENT) --}}
-                                        <div class="mb-4">
-                                            <label class="block text-xs font-bold text-gray-700 mb-1">Pilih Promo / Diskon (Opsional):</label>
-                                            <select name="promotion_id" id="stopPromotionSelect" onchange="calculateDiscount()" class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                                                <option value="" data-type="none" data-value="0" data-min-duration="0" data-min-amount="0">-- Tanpa Promo --</option>
-                                                @foreach($promotions->whereIn('type', ['discount_nominal', 'discount_percent']) as $promo)
-                                                    <option value="{{ $promo->id }}" 
-                                                            data-type="{{ $promo->type }}" 
-                                                            data-value="{{ $promo->discount_value }}" 
-                                                            data-min-duration="{{ $promo->min_duration_minutes }}"
-                                                            data-min-amount="{{ $promo->min_transaction_amount }}">
-                                                        🎉 {{ $promo->name }} 
-                                                        @if($promo->type === 'discount_nominal')
-                                                            (Potongan Rp {{ number_format($promo->discount_value, 0, ',', '.') }})
-                                                        @elseif($promo->type === 'discount_percent')
-                                                            (Diskon {{ $promo->discount_value }}%)
-                                                        @endif
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                            <p id="promoWarning" class="text-[11px] text-red-500 font-semibold mt-1 hidden"></p>
-                                        </div>
+    {{-- PILIHAN METODE PEMBAYARAN --}}
+    <div class="space-y-1.5" x-data="{ method: 'cash', total: {{ $grandTotal }} }">
+        <div class="flex items-center gap-2">
+            <label class="text-[11px] font-medium text-gray-600 flex-none">Metode:</label>
+            <select name="payment_method" 
+                    x-model="method" 
+                    onchange="document.getElementById('split-input-{{ $activeSession->id }}').style.display = (this.value === 'split') ? 'grid' : 'none'" 
+                    required 
+                    class="w-full text-xs border-gray-300 rounded-lg py-1 px-1.5">
+                <option value="cash">Tunai (Full Cash)</option>
+                <option value="qris">QRIS / Transfer (Full QRIS)</option>
+                <option value="split">🔀 Split (Cash + QRIS)</option>
+            </select>
+        </div>
+
+        {{-- INPUT SPLIT PAYMENT DENGAN KALKULATOR OTOMATIS --}}
+        <div id="split-input-{{ $activeSession->id }}" style="display: none;" class="grid-cols-2 gap-1.5 pt-1">
+            <div>
+                <label class="text-[10px] text-gray-500 font-bold">Bayar Cash (Rp)</label>
+                <input type="number" 
+                       name="cash_amount" 
+                       placeholder="0" 
+                       @input="$refs.qrisInput.value = Math.max(0, total - $el.value)"
+                       class="w-full text-xs border-gray-300 rounded-lg p-1">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-500 font-bold">Bayar QRIS (Rp)</label>
+                <input type="number" 
+                       x-ref="qrisInput"
+                       name="qris_amount" 
+                       placeholder="0" 
+                       class="w-full text-xs border-gray-300 rounded-lg p-1">
+            </div>
+        </div>
+    </div>
+
+    {{-- Pilihan Promo Diskon/Potongan --}}
+    <div class="mb-4">
+        <label class="block text-xs font-bold text-gray-700 mb-1">Pilih Promo / Diskon (Opsional):</label>
+        <select name="promotion_id" id="stopPromotionSelect" onchange="calculateDiscount()" class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="" data-type="none" data-value="0" data-min-duration="0" data-min-amount="0">-- Tanpa Promo --</option>
+            @foreach($promotions->whereIn('type', ['discount_nominal', 'discount_percent']) as $promo)
+                <option value="{{ $promo->id }}" 
+                        data-type="{{ $promo->type }}" 
+                        data-value="{{ $promo->discount_value }}" 
+                        data-min-duration="{{ $promo->min_duration_minutes }}"
+                        data-min-amount="{{ $promo->min_transaction_amount }}">
+                    🎉 {{ $promo->name }} 
+                    @if($promo->type === 'discount_nominal')
+                        (Potongan Rp {{ number_format($promo->discount_value, 0, ',', '.') }})
+                    @elseif($promo->type === 'discount_percent')
+                        (Diskon {{ $promo->discount_value }}%)
+                    @endif
+                </option>
+            @endforeach
+        </select>
+        <p id="promoWarning" class="text-[11px] text-red-500 font-semibold mt-1 hidden"></p>
+    </div>
+
                                         <script>
                                             function calculateDiscount() {
                                             const select = document.getElementById('stopPromotionSelect');
@@ -397,6 +426,8 @@
                                                 if (warningEl) warningEl.classList.add('hidden');
                                             }
                                         }</script>
+
+                                        
                                         @php
                                             $hasOpenShift = \App\Models\Shift::where('user_id', auth()->id())
                                                 ->where('status', 'open')
