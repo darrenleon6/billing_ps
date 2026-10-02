@@ -4,9 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\RentalSession;
 use App\Models\Order;
+use App\Models\Console; // Pastikan model Console ada
+use App\Models\Product; // Pastikan model Product ada
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+
 
 class ReportController extends Controller
 {
@@ -52,7 +58,6 @@ class ReportController extends Controller
         $grandTotal  = $sessions->sum('total_cost');
 
         // 🟢 3. Statistik FnB & HPP
-        // Jika Admin, hitung Omset, HPP, dan Profit. Jika Operator, hanya hitung Omset.
         if ($user->role === 'admin') {
             $fnbStats = Order::whereHas('rentalSession', function($q) use ($startDate, $endDate) {
                     $q->where('status', 'completed');
@@ -73,7 +78,6 @@ class ReportController extends Controller
             $fnbHPP     = $fnbStats->total_hpp ?? 0;
             $fnbProfit  = $fnbStats->total_profit ?? 0;
         } else {
-            // Untuk Operator: HPP dan Profit diisi 0 (atau tidak dihitung)
             $fnbRevenue = $sessions->sum('fnb_cost');
             $fnbHPP     = 0;
             $fnbProfit  = 0;
@@ -92,4 +96,117 @@ class ReportController extends Controller
             'fnbProfit'
         ));
     }
+
+    // ==========================================
+    // 🟢 TAMBAHAN: FITUR KIRIM LAPORAN OTOMATIS KE EMAIL
+    // ==========================================
+    public function sendAutoDailyReport()
+    {
+        $date = Carbon::today()->toDateString();
+        $time = Carbon::now()->format('H:i:s');
+
+        // Ambil data transaksi hari ini
+        $sessions = RentalSession::with(['console', 'orders.product'])
+            ->where('status', 'completed')
+            ->whereDate('end_time', $date)
+            ->get();
+
+        $totalRental = $sessions->sum('rental_cost');
+        $totalFnB    = $sessions->sum('fnb_cost');
+        $grandTotal  = $sessions->sum('total_cost');
+
+        // Ambil status unit PS/Console
+        $units = Console::all(); 
+
+        // Ambil data stok produk FnB
+        $products = Product::all();
+
+        // Buat File Excel Laporan Transaksi (.xlsx)
+        $spreadsheet = new Spreadsheet();
+        
+        // Sheet 1: Transaksi Harian
+        $sheet1 = $spreadsheet->getActiveSheet();
+        $sheet1->setTitle('Transaksi Harian');
+        $sheet1->setCellValue('A1', 'ID');
+        $sheet1->setCellValue('B1', 'Datetime');
+        $sheet1->setCellValue('C1', 'Unit Name');
+        $sheet1->setCellValue('D1', 'Unit Type');
+        $sheet1->setCellValue('E1', 'TotalRentalCost');
+        $sheet1->setCellValue('F1', 'FNB Order');
+        $sheet1->setCellValue('G1', 'GrandTotal');
+
+        $row = 2;
+        foreach ($sessions as $session) {
+            $sheet1->setCellValue("A{$row}", $session->id);
+            $sheet1->setCellValue("B{$row}", $session->end_time);
+            $sheet1->setCellValue("C{$row}", optional($session->console)->name ?? 'N/A');
+            $sheet1->setCellValue("D{$row}", optional($session->console)->type ?? 'PS');
+            $sheet1->setCellValue("E{$row}", $session->rental_cost);
+            $sheet1->setCellValue("F{$row}", $session->fnb_cost);
+            $sheet1->setCellValue("G{$row}", $session->total_cost);
+            $row++;
+        }
+
+        // Sheet 2: Stok Menu FnB
+        $sheet2 = $spreadsheet->createSheet();
+        $sheet2->setTitle('Stok Menu FNB');
+        $sheet2->setCellValue('A1', 'No');
+        $sheet2->setCellValue('B1', 'Nama Menu');
+        $sheet2->setCellValue('C1', 'Stok');
+        $sheet2->setCellValue('D1', 'Harga');
+        $sheet2->setCellValue('E1', 'Kategori');
+
+        $row2 = 2;
+        foreach ($products as $index => $prod) {
+            $sheet2->setCellValue("A{$row2}", $index + 1);
+            $sheet2->setCellValue("B{$row2}", $prod->name);
+            $sheet2->setCellValue("C{$row2}", $prod->stock);
+            $sheet2->setCellValue("D{$row2}", $prod->price);
+            $sheet2->setCellValue("E{$row2}", $prod->category ?? 'umum');
+            $row2++;
+        }
+
+        $fileName = 'laporan_rental_' . $date . '.xlsx';
+        $filePath = storage_path('app/' . $fileName);
+        
+        // Cukup gunakan satu baris writer yang benar ini:
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save($filePath);
+        
+        // --- AMBIL LINK DARI FILE TEKS DENGAN AMAN ---
+        $urlFile = storage_path('app/cloudflared_url.txt');
+        
+        // Default fallback awal
+        $cloudflaredUrl = 'http://localhost:8000';
+
+        if (file_exists($urlFile)) {
+            $content = trim(@file_get_contents($urlFile));
+            if (!empty($content)) {
+                $cloudflaredUrl = $content;
+            }
+        }
+    
+        // Kirim Email ke Admin
+        $emailTujuan = 'ps.jefelda@gmail.com'; // Ganti dengan email tujuan penerima laporan
+
+        $dataEmail = [
+            'date' => $date,
+            'time' => $time,
+            'rental' => $totalRental,
+            'fnb' => $totalFnB,
+            'grand_total' => $grandTotal,
+            'units' => $units,
+            'cloudflaredUrl' => $cloudflaredUrl
+        ];
+
+        Mail::send('emails.daily_reports', $dataEmail, function($message) use ($emailTujuan, $filePath, $date) {
+            $message->to($emailTujuan)
+                    ->subject('LAPORAN RENTAL OTOMATIS Tanggal ' . $date)
+                    ->attach($filePath);
+        });
+
+        return response()->json(['status' => 'Success', 'message' => 'Laporan otomatis berhasil dikirim ke email!']);
+    }
+
+    
 }
