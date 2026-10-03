@@ -91,5 +91,57 @@ class ShiftController extends Controller
 
         return view('reports.shifts', compact('shifts'));
     }
+
+    // 1. Update Shift oleh Admin
+    public function updateShift(Request $request, $id)
+    {
+        // Batasi hanya untuk admin
+        if (auth()->user()->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $shift = Shift::findOrFail($id);
+
+        $request->validate([
+            'starting_cash' => 'required|numeric|min:0',
+            'actual_cash'   => 'required|numeric|min:0',
+            'total_qris'    => 'required|numeric|min:0',
+        ]);
+
+        // Update data kas awal, fisik laci, dan total QRIS
+        $shift->starting_cash = $request->starting_cash;
+        $shift->actual_cash   = $request->actual_cash;
+        $shift->total_qris    = $request->total_qris;
+
+        // Hitung ulang selisih kas (difference_cash)
+        // Rumus selisih umumnya: Kas Fisik (actual_cash) - Kas Sistem (expected_cash)
+        // Atau jika mencakup QRIS, sesuaikan dengan rumus rekap kas sistemmu. 
+        // Di sini kita gunakan rumus standar: actual_cash - expected_cash
+        $expectedCash = $shift->expected_cash ?? 0;
+        $shift->difference_cash = $request->actual_cash - $expectedCash;
+
+        $shift->save();
+
+        return redirect()->back()->with('success', 'Riwayat shift berhasil diperbarui!');
+    }
+
+    // 2. Hapus Shift oleh Admin
+    public function destroyShift($id)
+    {
+        // Batasi hanya untuk admin
+        if (auth()->user()->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $shift = Shift::findOrFail($id);
+        
+        // Opsional: Jika ada relasi sesi rental ke shift_id, pastikan ditangani 
+        // agar database tidak error (misal set null atau hapus relasinya)
+        // RentalSession::where('shift_id', $shift->id)->update(['shift_id' => null]);
+
+        $shift->delete();
+
+        return redirect()->back()->with('success', 'Riwayat shift berhasil dihapus!');
+    }
     
 }

@@ -26,23 +26,23 @@ class UserSeeder extends Seeder
 
         // 2. Akun Operator / Kasir Shift 1
         User::updateOrCreate(
-            ['username' => 'kasir1'],
+            ['username' => 'stefanus'],
             [
-                'name' => 'Operator Shift Pagi',
-                'username' => 'kasir1',
+                'name' => 'Stefanus',
+                'username' => 'stefanus',
                 'role' => 'operator',
-                'password' => Hash::make('kasir123'),
+                'password' => Hash::make('stefanus123'),
             ]
         );
 
         // 3. Akun Operator / Kasir Shift 2
         User::updateOrCreate(
-            ['username' => 'kasir2'],
+            ['username' => 'budi'],
             [
-                'name' => 'Operator Shift Malam',
-                'username' => 'kasir2',
+                'name' => 'Budi',
+                'username' => 'budi',
                 'role' => 'operator',
-                'password' => Hash::make('kasir123'),
+                'password' => Hash::make('budi123'),
             ]
         );
     }

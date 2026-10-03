@@ -1,41 +1,44 @@
-{{-- TOMBOL HAMBURGER MELAYANG (Tampil di Pojok Kiri Atas) --}}
-<button type="button"
-        onclick="toggleSidebar()"
-        class="fixed top-4 left-4 z-40 bg-slate-900/90 backdrop-blur-md text-white p-2.5 rounded-2xl shadow-xl hover:bg-slate-800 transition-all duration-200 cursor-pointer flex items-center justify-center border border-slate-700/50 hover:scale-105 active:scale-95">
-    <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"/>
-    </svg>
-</button>
+    {{-- TOMBOL HAMBURGER MELAYANG (Tampil di Pojok Kiri Atas) --}}
+    <button type="button"
+            onclick="toggleSidebar()"
+            class="fixed top-4 left-4 z-40 bg-slate-900/90 backdrop-blur-md p-2.5 rounded-2xl shadow-xl hover:bg-slate-800 transition-all duration-200 cursor-pointer flex items-center justify-center border border-slate-700/50 hover:scale-105 active:scale-95"  style="color: #3790f4;">
+        <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </button>
 
-{{-- OVERLAY LATAR BELAKANG GELAP SAAT SIDEBAR DIBUKA (Opsional tapi keren) --}}
-<div id="sidebar-overlay" 
-     onclick="toggleSidebar()" 
-     class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-40 transition-opacity duration-300 opacity-0 pointer-events-none">
-</div>
-
-{{-- SIDEBAR UTAMA (Model Slide-Over Modern) --}}
-<aside id="sidebar-menu"
-       style="transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);"
-       class="w-72 bg-gradient-to-b from-[#0f172a] to-[#1e1b4b] text-white flex flex-col h-screen fixed top-0 left-0 border-r border-slate-800/80 z-50 shadow-2xl">
-    
-    {{-- LOGO BRANDING & TOMBOL CLOSE X --}}
-    <div class="p-5 border-b border-slate-800/80 flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-            <div class="bg-indigo-600 text-white font-black px-2.5 py-1.5 rounded-xl text-xs tracking-wider shadow-lg shadow-indigo-500/30">
-                PS
-            </div>
-            <span class="font-extrabold text-sm tracking-wider text-white">RENTAL PS KITA</span>
-        </div>
-
-        {{-- Tombol X Close --}}
-        <button type="button" 
-                onclick="toggleSidebar()"
-                class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-        </button>
+    {{-- OVERLAY LATAR BELAKANG GELAP SAAT SIDEBAR DIBUKA (Opsional tapi keren) --}}
+    <div id="sidebar-overlay" 
+        onclick="toggleSidebar()" 
+        class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-40 transition-opacity duration-300 opacity-0 pointer-events-none">
     </div>
+
+    {{-- SIDEBAR UTAMA (Model Slide-Over Modern) --}}
+    <aside id="sidebar-menu"
+        style="transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);"
+        class="w-72 bg-gradient-to-b from-[#0f172a] to-[#1e1b4b] text-white flex flex-col h-screen fixed top-0 left-0 border-r border-slate-800/80 z-50 shadow-2xl">
+        
+        {{-- LOGO BRANDING & TOMBOL CLOSE X --}}
+        <div class="p-5 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+                {{-- 🟢 GAMBAR LOGO GUARD PLAYSTATION --}}
+                <img src="{{ asset('images/logo-guard.png') }}" alt="Guard PlayStation Logo" class="h-14 w-auto object-contain rounded-xl">
+                {{-- 🟢 TEKS BRANDING NAMA RENTAL --}}
+                <div class="flex flex-col">
+                    <span class="font-extrabold text-sm tracking-wider" style="color: #3790f4;">GUARD</span>
+                    <span class="text-[9px] tracking-widest text-white-400 uppercase font-bold">PLAYSTATION</span>
+                </div>
+            </div>
+
+            {{-- Tombol X Close --}}
+            <button type="button" 
+                    onclick="toggleSidebar()"
+                    class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
 
     {{-- MENU-MENU SIDEBAR (Desain Pill Active yang Cantik) --}}
     <div class="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto custom-scrollbar">

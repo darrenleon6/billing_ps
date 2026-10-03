@@ -9,8 +9,18 @@
 
     <body class="bg-gray-100 font-sans text-gray-800">
             @include('layouts.navigation')
-    <div class="py-6">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+    <div class="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        
+        {{-- Header --}}
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">Manajemen Paket</h1>
+                <p class="text-xs text-gray-500">Kelola daftar paket rental, durasi main, dan harga paket tetap.</p>
+            </div>
+            <button type="button" onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition shadow-md flex items-center gap-2">
+                ➕ <span>Tambah Paket Baru</span>
+            </button>
+        </div>
 
             {{-- Alert Notifikasi --}}
             @if(session('success'))
@@ -24,12 +34,7 @@
                 </div>
             @endif
 
-            <div class="flex justify-between items-center">
-                <p class="text-sm text-gray-600">Kelola daftar paket rental, durasi main, dan harga paket tetap.</p>
-                <button type="button" onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition shadow-md flex items-center gap-2">
-                    ➕ <span>Tambah Paket Baru</span>
-                </button>
-            </div>
+          
 
             {{-- TABEL DATA PAKET --}}
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-2xl border border-gray-100">
@@ -87,7 +92,7 @@
                 </div>
             </div>
 
-        </div>
+        
     </div>
 
     {{-- MODAL TAMBAH PAKET --}}

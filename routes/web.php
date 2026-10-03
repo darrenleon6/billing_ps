@@ -44,6 +44,11 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('promotions', PromotionController::class)->except(['create', 'edit', 'show']);
         Route::resource('consoles', ConsoleController::class)->except(['create', 'edit', 'show']);
         Route::resource('packages', PackageController::class)->except(['create', 'edit', 'show']);
+        Route::get('/reports/transactions/{id}/edit', [ReportController::class, 'editTransaction'])->name('reports.transactions.edit');
+        Route::put('/reports/transactions/{id}', [ReportController::class, 'updateTransaction'])->name('reports.transactions.update');
+        Route::delete('/reports/transactions/{id}', [ReportController::class, 'destroyTransaction'])->name('reports.transactions.destroy');
+        Route::put('/shifts/{id}', [ShiftController::class, 'updateShift'])->name('shifts.update');
+        Route::delete('/shifts/{id}', [ShiftController::class, 'destroyShift'])->name('shifts.destroy');
         
     });
 

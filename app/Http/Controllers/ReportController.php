@@ -14,6 +14,8 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 
+
+
 class ReportController extends Controller
 {
     public function index(Request $request)
@@ -95,6 +97,87 @@ class ReportController extends Controller
             'fnbHPP',
             'fnbProfit'
         ));
+    }
+
+
+    // 1. Tampilkan Form Edit Transaksi
+    public function editTransaction($id)
+    {
+        // Pastikan hanya admin yang bisa akses
+        if (auth()->user()->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $session = RentalSession::with(['console', 'orders.product'])->findOrFail($id);
+        return view('reports.edit-transaction', compact('session'));
+    }
+
+    // 2. Simpan Perubahan Transaksi
+    public function updateTransaction(Request $request, $id)
+    {
+        if (auth()->user()->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $session = RentalSession::findOrFail($id);
+
+        $request->validate([
+            'rental_cost' => 'required|numeric|min:0',
+            'products' => 'nullable|array', // ID produk yang dipilih
+            'quantities' => 'nullable|array', // Jumlah masing-masing produk
+        ]);
+
+        // 1. Update biaya sewa PS
+        $session->rental_cost = $request->rental_cost;
+
+        // 2. Hapus order FnB lama untuk session ini, lalu hitung ulang
+        $session->orders()->delete();
+
+        $fnbCost = 0;
+        if ($request->has('products')) {
+            foreach ($request->products as $index => $productId) {
+                $qty = $request->quantities[$index] ?? 0;
+                if ($qty > 0 && !empty($productId)) {
+                    $product = Product::find($productId);
+                    if ($product) {
+                        $subtotal = $product->price * $qty;
+                        $fnbCost += $subtotal;
+
+                        // Buat / masukkan order baru
+                        Order::create([
+                            'rental_session_id' => $session->id,
+                            'product_id' => $product->id,
+                            'quantity' => $qty,
+                            'price' => $product->price,
+                            'subtotal' => $subtotal,
+                        ]);
+                    }
+                }
+            }
+        }
+
+        // 3. Simpan fnb_cost dan hitung grand total baru
+        $session->fnb_cost = $fnbCost;
+        $session->total_cost = $session->rental_cost + $session->fnb_cost;
+        $session->save();
+
+        return redirect()->back()->with('success', 'Transaksi berhasil diperbarui!');
+    }
+
+    // 3. Hapus Transaksi
+    public function destroyTransaction($id)
+    {
+        if (auth()->user()->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $session = RentalSession::findOrFail($id);
+        
+        // Hapus relasi order FnB terkait jika ada, lalu hapus session-nya
+        $session->orders()->delete();
+        $session->delete();
+
+        return redirect()->route('reports.transactions')->with('success', 'Transaksi berhasil dihapus!');
     }
 
     // ==========================================

@@ -10,8 +10,18 @@
 
     @include('layouts.navigation')
 
-    <div class="py-6">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+     <div class="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        
+        {{-- Header --}}
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">Manajemen Promo</h1>
+                <p class="text-xs text-gray-500">Kelola daftar promo diskon nominal, persen, dan bonus waktu sewa PS.</p>
+            </div>
+            <button onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition shadow-md flex items-center gap-2">
+                    ➕ <span>Tambah Promo Baru</span>
+                </button>
+        </div>
 
             {{-- Alert Success / Error --}}
             @if(session('success'))
@@ -19,13 +29,6 @@
                     <span class="block sm:inline">{{ session('success') }}</span>
                 </div>
             @endif
-
-            <div class="flex justify-between items-center">
-                <p class="text-sm text-gray-600">Kelola daftar promo diskon nominal, persen, dan bonus waktu sewa PS.</p>
-                <button onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition shadow-md flex items-center gap-2">
-                    ➕ <span>Tambah Promo Baru</span>
-                </button>
-            </div>
 
             {{-- TABEL DAFTAR PROMO --}}
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-2xl border border-gray-100">

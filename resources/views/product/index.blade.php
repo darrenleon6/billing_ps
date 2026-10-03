@@ -13,6 +13,14 @@
 
     <div class="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         
+        {{-- Header --}}
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">Manajemen Stok & Produk</h1>
+                <p class="text-xs text-gray-500">Kelola stok dan informasi produk FnB di rental PS</p>
+            </div>
+        </div>
+        
         {{-- Flash Alert Success --}}
         @if(session('success'))
             <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg text-sm font-semibold">

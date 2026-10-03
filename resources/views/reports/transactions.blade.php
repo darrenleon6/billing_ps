@@ -159,6 +159,10 @@
                             <th class="p-3">Sewa PS</th>
                             <th class="p-3">Item FnB</th>
                             <th class="p-3">Total Tagihan</th>
+                            {{-- 🟢 Header untuk Kolom Aksi Khusus Admin --}}
+                            @if(auth()->check() && auth()->user()->role === 'admin')
+                                <th class="p-3 text-center">Aksi</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
@@ -183,10 +187,39 @@
                             <td class="p-3 font-bold text-indigo-600">
                                 Rp {{ number_format($session->total_cost, 0, ',', '.') }}
                             </td>
+                            {{-- 🟢 Tombol Edit & Hapus Khusus Admin --}}
+                            @if(auth()->check() && auth()->user()->role === 'admin')
+                                <td class="p-3 text-center">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <!-- Tombol Edit -->
+                                        <button type="button" 
+                                                onclick="openEditModal('{{ $session->id }}', '{{ $session->console->name ?? 'Console' }}', '{{ $session->rental_cost }}', {{ $session->orders->toJson() }}, '{{ route('reports.transactions.update',$session->id) }}')" 
+                                                class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded shadow-sm font-medium transition" 
+                                                title="Edit Transaksi">
+                                            Edit
+                                        </button>
+
+                                        <!-- Tombol Hapus -->
+                                        <form action="{{ route('reports.transactions.destroy', $session->id) }}" 
+                                            method="POST" 
+                                            onsubmit="return confirm('Yakin ingin menghapus transaksi ini? Data pendapatan akan disesuaikan kembali.');" 
+                                            class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" 
+                                                    class="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded shadow-sm font-medium transition" 
+                                                    title="Hapus Transaksi">
+                                                Hapus
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            @endif
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="p-4 text-center text-gray-500 italic">
+                           {{-- colspan disesuaikan jika admin (6 kolom) atau operator (5 kolom) --}}
+                            <td colspan="{{ (auth()->check() && auth()->user()->role === 'admin') ? 6 : 5 }}" class="p-4 text-center text-gray-500 italic">
                                 Belum ada riwayat transaksi yang sesuai.
                             </td>
                         </tr>
@@ -227,6 +260,99 @@
             }
         </script>
     @endif
+    {{-- MODAL EDIT TRANSAKSI & FNB --}}
+    <div id="editModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden p-6 relative max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+                <h3 class="text-base font-bold text-gray-800">Edit Transaksi Unit: <span id="modalConsoleName" class="text-indigo-600"></span></h3>
+                <button type="button" onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+            </div>
 
+            <form id="editForm" method="POST">
+                @csrf
+                @method('PUT')
+
+                {{-- Biaya Sewa PS --}}
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1.5">Biaya Sewa PS (Rp)</label>
+                    <input type="number" name="rental_cost" id="modalRentalCost" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500 outline-none" required>
+                </div>
+
+                {{-- Kelola Item FnB --}}
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="block text-xs font-bold text-gray-700 uppercase">Item FnB (Opsional)</label>
+                        <button type="button" onclick="addFnbRow()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                            + Tambah Item
+                        </button>
+                    </div>
+                    
+                    <div id="fnbListContainer" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500 outline-none">
+                        {{-- Baris item FnB dirender dinamis via JS --}}
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition">
+                        Batal
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    // Simpan daftar semua produk dari database ke variabel global JS
+    const allProducts = @json(\App\Models\Product::all());
+
+    function openEditModal(id, consoleName, rentalCost, orders, updateUrl) {
+        document.getElementById('modalConsoleName').innerText = consoleName;
+        document.getElementById('modalRentalCost').value = rentalCost;
+        document.getElementById('editForm').action = updateUrl;
+        
+        // Kosongkan container FnB dulu
+        const container = document.getElementById('fnbListContainer');
+        container.innerHTML = '';
+
+        // Jika ada order FnB sebelumnya, masukkan ke baris modal
+        if (orders && orders.length > 0) {
+            orders.forEach(order => {
+                addFnbRow(order.product_id, order.quantity);
+            });
+        } else {
+            // Biarkan kosong atau sediakan 1 baris kosong opsional
+            addFnbRow();
+        }
+
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').classList.add('hidden');
+    }
+
+    function addFnbRow(selectedProductId = '', quantity = 1) {
+        const container = document.getElementById('fnbListContainer');
+        
+        let optionsHtml = '<option value="">-- Pilih Menu FnB --</option>';
+        allProducts.forEach(prod => {
+            let selected = (prod.id == selectedProductId) ? 'selected' : '';
+            optionsHtml += `<option value="${prod.id}" ${selected}>${prod.name} (Rp ${Number(prod.price).toLocaleString('id-ID')})</option>`;
+        });
+
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'flex items-center gap-2 bg-gray-50 p-2.5 rounded-xl border border-gray-200';
+        rowDiv.innerHTML = `
+            <select name="products[]" class="w-3/4 px-3 py-1.5 border border-gray-300 bg-white rounded-lg shadow-sm text-xs focus:border-indigo-500 focus:ring-indigo-500 outline-none">
+                ${optionsHtml}
+            </select>
+            <input type="number" name="quantities[]" value="${quantity}" min="1" class="w-1/5 px-2 py-1.5 border border-gray-300 bg-white rounded-lg shadow-sm text-xs text-center focus:border-indigo-500 focus:ring-indigo-500 outline-none" placeholder="Qty">
+            <button type="button" onclick="this.parentElement.remove()" class="text-rose-400 hover:text-rose-600 font-bold px-1.5 py-1 text-sm transition" title="Hapus Item">&times;</button>
+        `;
+        container.appendChild(rowDiv);
+    }
+    </script>
 </body>
 </html>
