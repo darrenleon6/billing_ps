@@ -156,6 +156,7 @@
                         <tr class="bg-gray-100 text-gray-700 uppercase tracking-wider border-b">
                             <th class="p-3">Tanggal & Waktu</th>
                             <th class="p-3">Unit PS</th>
+                            <th class="p-3">Jam Mulai dan Selesai</th>
                             <th class="p-3">Sewa PS</th>
                             <th class="p-3">Item FnB</th>
                             <th class="p-3">Total Tagihan</th>
@@ -173,6 +174,12 @@
                             </td>
                             <td class="p-3 font-bold text-gray-800">
                                 {{ $session->console->name ?? 'Console' }}
+                            </td>
+                            {{-- Kolom Jam Mulai & Selesai (BARU) --}}
+                            <td class="p-3.5 px-4 font-mono font-semibold text-gray-900">
+                                {{ $session->start_time ? \Carbon\Carbon::parse($session->start_time)->format('H:i') : '-' }} 
+                                <span class="text-gray-400 mx-1 font-normal">s/d</span> 
+                                {{ $session->end_time ? \Carbon\Carbon::parse($session->end_time)->format('H:i') : '-' }}
                             </td>
                             <td class="p-3 text-gray-700">
                                 Rp {{ number_format($session->rental_cost, 0, ',', '.') }}

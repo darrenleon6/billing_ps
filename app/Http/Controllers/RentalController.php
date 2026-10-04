@@ -204,7 +204,7 @@ class RentalController extends Controller
 
         // --- LOGIKA PENGECEKAN & APLIKASI PROMO ---
         $discountAmount = 0;
-        $appliedPromoId = null;
+        $appliedPromoId = $session->promotion_id;
 
         if ($request->filled('promotion_id')) {
             $promo = \App\Models\Promotion::find($request->promotion_id);
