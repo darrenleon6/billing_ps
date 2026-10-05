@@ -159,7 +159,11 @@
                             <th class="p-3">Jam Mulai dan Selesai</th>
                             <th class="p-3">Sewa PS</th>
                             <th class="p-3">Item FnB</th>
+                            <th class="p-3">Metode</th>
+                            <th class="px-4 py-3">Cash</th>
+                            <th class="px-4 py-3">QRIS</th>
                             <th class="p-3">Total Tagihan</th>
+                            
                             {{-- 🟢 Header untuk Kolom Aksi Khusus Admin --}}
                             @if(auth()->check() && auth()->user()->role === 'admin')
                                 <th class="p-3 text-center">Aksi</th>
@@ -191,6 +195,25 @@
                                     <span class="text-gray-400 italic">Tanpa FnB</span>
                                 @endforelse
                             </td>
+                            <td class="p-3 font-bold text-gray-800">
+                                {{ strtoupper($session->payment_method ?? 'Payment Method') }}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-green-600 font-semibold">
+                                @if($session->cash_amount > 0)
+                                    Rp {{ number_format($session->cash_amount, 0, ',', '.') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+
+                            <!-- Kolom QRIS -->
+                            <td class="px-4 py-3 text-sm text-blue-600 font-semibold">
+                                @if($session->qris_amount > 0)
+                                    Rp {{ number_format($session->qris_amount, 0, ',', '.') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
                             <td class="p-3 font-bold text-indigo-600">
                                 Rp {{ number_format($session->total_cost, 0, ',', '.') }}
                             </td>
@@ -199,12 +222,21 @@
                                 <td class="p-3 text-center">
                                     <div class="inline-flex items-center gap-1.5">
                                         <!-- Tombol Edit -->
-                                        <button type="button" 
-                                                onclick="openEditModal('{{ $session->id }}', '{{ $session->console->name ?? 'Console' }}', '{{ $session->rental_cost }}', {{ $session->orders->toJson() }}, '{{ route('reports.transactions.update',$session->id) }}')" 
-                                                class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded shadow-sm font-medium transition" 
-                                                title="Edit Transaksi">
-                                            Edit
-                                        </button>
+                                       <button type="button" 
+                                        onclick="openEditModal(
+                                            '{{ $session->id }}', 
+                                            '{{ addslashes($session->console->name ?? 'Console') }}', 
+                                            '{{ $session->rental_cost }}', 
+                                            {{ $session->orders->toJson() }}, 
+                                            '{{ route('reports.transactions.update', $session->id) }}',
+                                            '{{ $session->cash_amount ?? 0 }}', 
+                                            '{{ $session->qris_amount ?? 0 }}',
+                                            '{{ $session->payment_method ?? 'cash' }}'
+                                        )" 
+                                        class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded shadow-sm font-medium transition" 
+                                        title="Edit Transaksi">
+                                        Edit
+                                    </button>
 
                                         <!-- Tombol Hapus -->
                                         <form action="{{ route('reports.transactions.destroy', $session->id) }}" 
@@ -285,6 +317,28 @@
                     <input type="number" name="rental_cost" id="modalRentalCost" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500 outline-none" required>
                 </div>
 
+               <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1.5">Metode Pembayaran</label>
+                    <select name="payment_method" id="modalPaymentMethod" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500 outline-none" required>
+                        <option value="cash">Cash</option>
+                        <option value="qris">QRIS</option>
+                        <option value="split">Split Payment</option>
+                    </select>
+                </div>
+
+                <!-- Input Nominal Cash -->
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nominal Cash (Rp)</label>
+                        <!-- 🟢 Tambahkan id="cashAmountInput" dan hapus number_format dari value input angka -->
+                        <input type="number" id="cashAmountInput" name="cash_amount" value="{{ $session->cash_amount ?? 0 }}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm">
+                    </div>
+
+                    <!-- Input Nominal QRIS -->
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nominal QRIS (Rp)</label>
+                        <!-- 🟢 Tambahkan id="qrisAmountInput" dan hapus number_format dari value input angka -->
+                        <input type="number" id="qrisAmountInput" name="qris_amount" value="{{ $session->qris_amount ?? 0 }}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm">
+                    </div>
                 {{-- Kelola Item FnB --}}
                 <div class="mb-4">
                     <div class="flex justify-between items-center mb-1.5">
@@ -314,11 +368,17 @@
     // Simpan daftar semua produk dari database ke variabel global JS
     const allProducts = @json(\App\Models\Product::all());
 
-    function openEditModal(id, consoleName, rentalCost, orders, updateUrl) {
+    function openEditModal(id, consoleName, rentalCost, orders, updateUrl, cashAmount, qrisAmount, paymentMethod) {
         document.getElementById('modalConsoleName').innerText = consoleName;
         document.getElementById('modalRentalCost').value = rentalCost;
         document.getElementById('editForm').action = updateUrl;
-        
+        document.getElementById('cashAmountInput').value = cashAmount;
+        document.getElementById('qrisAmountInput').value = qrisAmount;
+        const paymentSelect = document.getElementById('modalPaymentMethod');
+        if (paymentSelect) {
+            paymentSelect.value = paymentMethod; 
+        }
+
         // Kosongkan container FnB dulu
         const container = document.getElementById('fnbListContainer');
         container.innerHTML = '';

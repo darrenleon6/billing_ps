@@ -59,6 +59,11 @@ class ReportController extends Controller
         $totalFnB    = $sessions->sum('fnb_cost');
         $grandTotal  = $sessions->sum('total_cost');
 
+        $cash_amount = $sessions->sum('cash_amount');
+        $qris_amount = $sessions->sum('qris_amount');
+
+
+
         // 🟢 3. Statistik FnB & HPP
         if ($user->role === 'admin') {
             $fnbStats = Order::whereHas('rentalSession', function($q) use ($startDate, $endDate) {
@@ -92,6 +97,8 @@ class ReportController extends Controller
             'grandTotal',
             'startDate',
             'endDate',
+            'cash_amount',
+            'qris_amount',
             'errorMessage',
             'fnbRevenue',
             'fnbHPP',
@@ -123,12 +130,17 @@ class ReportController extends Controller
 
         $request->validate([
             'rental_cost' => 'required|numeric|min:0',
+            'cash_amount'  => 'nullable|numeric|min:0',
+            'qris_amount'  => 'nullable|numeric|min:0',
+            'payment_method' => 'required|string', // Validasi metode pembayaran
             'products' => 'nullable|array', // ID produk yang dipilih
             'quantities' => 'nullable|array', // Jumlah masing-masing produk
         ]);
 
         // 1. Update biaya sewa PS
         $session->rental_cost = $request->rental_cost;
+        
+        $session->payment_method = $request->payment_method;
 
         // 2. Hapus order FnB lama untuk session ini, lalu hitung ulang
         $session->orders()->delete();
@@ -157,8 +169,41 @@ class ReportController extends Controller
         }
 
         // 3. Simpan fnb_cost dan hitung grand total baru
+        // 4. Simpan biaya FnB baru
         $session->fnb_cost = $fnbCost;
-        $session->total_cost = $session->rental_cost + $session->fnb_cost;
+
+        // 5. Hitung Subtotal sebelum diskon (Sewa PS + FnB)
+        $subtotalBeforeDiscount = $session->rental_cost + $session->fnb_cost;
+        
+        $discountAmount = 0;
+
+        // Cek jenis promo yang terikat pada transaksi ini
+        if ($session->promotion) {
+            // Asumsi struktur tabel promotions memiliki kolom 'type' (misal: 'percentage' atau 'fixed') 
+            // dan kolom 'value' (isi angka persentase atau nominal potongannya)
+            if ($session->promotion->type === 'percentage') {
+                // Jika promo persentase (misal: 10 berarti 10%)
+                $percentage = $session->promotion->value ?? 0;
+                $discountAmount = ($subtotalBeforeDiscount * $percentage) / 100;
+            } else {
+                // Jika promo nominal tetap (fixed)
+                $discountAmount = $session->promotion->value ?? ($session->discount_amount ?? 0);
+            }
+        } else {
+            // Fallback jika tidak ada relasi promotion, pakai kolom discount_amount yang tersimpan
+            $discountAmount = $session->discount_amount ?? 0;
+        }
+
+        // Simpan nilai diskon yang berlaku ke database
+        $session->discount_amount = $discountAmount;
+
+        // 6. Hitung Grand Total setelah dikurangi diskon
+        $session->total_cost = max(0, $subtotalBeforeDiscount - $discountAmount);
+
+        // 7. Simpan nominal cash dan qris dari inputan form edit modal
+        $session->cash_amount = $request->cash_amount ?? 0;
+        $session->qris_amount = $request->qris_amount ?? 0;
+
         $session->save();
 
         return redirect()->back()->with('success', 'Transaksi berhasil diperbarui!');
