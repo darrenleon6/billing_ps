@@ -19,11 +19,11 @@ class RentalController extends Controller
 
     public function index()
     {
-        // 1. Ambil semua console beserta sesi aktif
+      // 1. Ambil semua console beserta sesi yang berstatus 'active' ATAU 'paused'
         $consoles = Console::with(['sessions' => function ($query) {
-            $query->where('status', 'active')->with(['orders.product', 'package']);
+            $query->whereIn('status', ['active', 'paused'])
+                  ->with(['orders.product', 'package']);
         }])->orderBy('name', 'asc')->get();
-
         // 2. Ambil produk FnB & Paket
         $products = Product::orderBy('name', 'asc')->get();
         $packages = Package::all();
@@ -157,8 +157,15 @@ class RentalController extends Controller
         $session = RentalSession::with(['console', 'package', 'orders'])->findOrFail($id);
 
         $endTime = Carbon::now();
-        $startTime = Carbon::parse($session->start_time);
-        $totalMinutes = $startTime->diffInMinutes($endTime);
+
+        // 1. Hitung total detik aktif dengan mengurangkan total durasi pause
+        $totalSeconds = Carbon::parse($session->start_time)->diffInSeconds($endTime) - ($session->total_paused_duration ?? 0);
+
+        // Pastikan tidak minus (jaga-jaga)
+        $totalSeconds = max(0, $totalSeconds);
+
+        // 2. Ubah total detik bersih ke dalam bentuk menit (dibulatkan ke atas)
+        $totalMinutes = ceil($totalSeconds / 60);
 
         $rentalCost = 0;
 
@@ -265,7 +272,7 @@ class RentalController extends Controller
         $session->update([
             'shift_id'        => $activeShift->id,
             'end_time'        => $endTime,
-            'rental_cost'     => $rentalCost,
+            'rental_cost'     => max(0, $rentalCost - $discountAmount),
             'fnb_cost'        => $fnbCost,
             'promotion_id'    => $appliedPromoId,   // 👈 Simpan ID promo yang digunakan
             'discount_amount' => $discountAmount,  // 👈 Simpan nominal potongan harga
@@ -430,5 +437,42 @@ class RentalController extends Controller
         });
 
         return redirect()->back()->with('success', "Sesi berhasil dipindahkan dari {$session->console->name} ke {$newConsole->name}!");
+    }
+
+    // 1. Fungsi Pause Sesi
+    public function pauseSession($id)
+    {
+        $rental = RentalSession::findOrFail($id);
+        
+        if ($rental->status === 'active') {
+            // Simpan waktu saat ini sebagai waktu terakhir sesi aktif sebelum dipause
+            $rental->paused_at = Carbon::now();
+            $rental->status = 'paused';
+            $rental->save();
+        }
+
+        return back()->with('success', 'Sesi berhasil dijeda.');
+    }
+
+    // 2. Fungsi Resume Sesi
+    public function resumeSession($id)
+    {
+        $rental = RentalSession::findOrFail($id);
+        
+        if ($rental->status === 'paused' && $rental->paused_at) {
+            // Hitung berapa lama sesi ini dijeda (dalam detik)
+            $pausedDuration = Carbon::parse($rental->paused_at)->diffInSeconds(Carbon::now());
+            
+            // Geser waktu mulai (start_time) ke depan sejumlah waktu jeda tersebut,
+            // sehingga durasi yang terhitung tidak jalan selama masa pause.
+            $rental->start_time = Carbon::parse($rental->start_time)->addSeconds($pausedDuration);
+            
+            // Reset status dan paused_at
+            $rental->paused_at = null;
+            $rental->status = 'active';
+            $rental->save();
+        }
+
+        return back()->with('success', 'Sesi rental dilanjutkan.');
     }
 }

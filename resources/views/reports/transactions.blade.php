@@ -154,16 +154,17 @@
                 <table class="w-full text-left border-collapse text-xs">
                     <thead>
                         <tr class="bg-gray-100 text-gray-700 uppercase tracking-wider border-b">
-                            <th class="p-3">Tanggal & Waktu</th>
-                            <th class="p-3">Unit PS</th>
-                            <th class="p-3">Jam Mulai dan Selesai</th>
-                            <th class="p-3">Sewa PS</th>
-                            <th class="p-3">Item FnB</th>
-                            <th class="p-3">Metode</th>
-                            <th class="px-4 py-3">Cash</th>
-                            <th class="px-4 py-3">QRIS</th>
-                            <th class="p-3">Total Tagihan</th>
-                            
+                            <th class="p-3 text-center">Tanggal & Waktu</th>
+                            <th class="p-3 text-center">Unit PS</th>
+                            <th class="p-3 text-center">Jam Mulai dan Selesai</th>
+                            <th class="p-3 text-center">Sewa PS</th>
+                            <th class="p-3 text-center">Item FnB</th>
+                            <th class="p-3 text-center">Metode</th>
+                            <th class="px-4 py-3 text-center">Cash</th>
+                            <th class="px-4 py-3 text-center">QRIS</th>
+                            <th class="p-3 text-center">Promo</th>
+                            <th class="p-3 text-center">Total Tagihan</th>
+
                             {{-- 🟢 Header untuk Kolom Aksi Khusus Admin --}}
                             @if(auth()->check() && auth()->user()->role === 'admin')
                                 <th class="p-3 text-center">Aksi</th>
@@ -173,32 +174,33 @@
                     <tbody class="divide-y divide-gray-200">
                         @forelse($sessions as $session)
                         <tr class="hover:bg-gray-50">
-                            <td class="p-3 text-gray-600">
+                            <td class="p-3 text-gray-600 text-center">
                                 {{ \Carbon\Carbon::parse($session->end_time)->format('d M Y, H:i') }}
                             </td>
-                            <td class="p-3 font-bold text-gray-800">
+                            <td class="p-3 font-bold text-gray-800 whitespace-nowrap align-middle">
                                 {{ $session->console->name ?? 'Console' }}
                             </td>
                             {{-- Kolom Jam Mulai & Selesai (BARU) --}}
-                            <td class="p-3.5 px-4 font-mono font-semibold text-gray-900">
+                            <td class="p-3.5 px-4 font-mono font-semibold text-gray-900 text-center whitespace-nowrap align-middle">
                                 {{ $session->start_time ? \Carbon\Carbon::parse($session->start_time)->format('H:i') : '-' }} 
                                 <span class="text-gray-400 mx-1 font-normal">s/d</span> 
                                 {{ $session->end_time ? \Carbon\Carbon::parse($session->end_time)->format('H:i') : '-' }}
                             </td>
-                            <td class="p-3 text-gray-700">
+                            <td class="p-3 text-gray-700 text-center whitespace-nowrap align-middle">
                                 Rp {{ number_format($session->rental_cost, 0, ',', '.') }}
                             </td>
-                            <td class="p-3 text-gray-600">
+                            <td class="p-3 text-gray-600 text-center whitespace-nowrap align-middle">
                                 @forelse($session->orders as $order)
                                     <div>• {{ $order->product->name ?? 'Produk' }} (x{{ $order->quantity }})</div>
                                 @empty
                                     <span class="text-gray-400 italic">Tanpa FnB</span>
                                 @endforelse
                             </td>
-                            <td class="p-3 font-bold text-gray-800">
+                            <td class="p-3 font-bold text-gray-800 text-center whitespace-nowrap align-middle">
                                 {{ strtoupper($session->payment_method ?? 'Payment Method') }}
                             </td>
-                            <td class="px-4 py-3 text-sm text-green-600 font-semibold">
+                            {{-- 🟢 PERBAIKAN KOLOM CASH: Tambahkan whitespace-nowrap --}}
+                            <td class="px-4 py-3 text-sm text-green-600 font-semibold text-center whitespace-nowrap align-middle">
                                 @if($session->cash_amount > 0)
                                     Rp {{ number_format($session->cash_amount, 0, ',', '.') }}
                                 @else
@@ -206,15 +208,25 @@
                                 @endif
                             </td>
 
-                            <!-- Kolom QRIS -->
-                            <td class="px-4 py-3 text-sm text-blue-600 font-semibold">
+                            {{-- 🟢 PERBAIKAN KOLOM QRIS: Tambahkan whitespace-nowrap dan hapus justify-center/space-y-1 yang tidak perlu --}}
+                            <td class="px-4 py-3 text-sm text-blue-600 font-semibold text-center whitespace-nowrap align-middle">
                                 @if($session->qris_amount > 0)
                                     Rp {{ number_format($session->qris_amount, 0, ',', '.') }}
                                 @else
                                     -
                                 @endif
                             </td>
-                            <td class="p-3 font-bold text-indigo-600">
+                            <td class="px-4 py-3 text-center whitespace-nowrap align-middle">
+                                {{-- Badge Kode Promo Saja --}}
+                                @if($session->promotion)
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                        <span>🏷️</span> {{ $session->promotion->code }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-400 text-xs italic">-</span>
+                                @endif
+                            </td>
+                            <td class="p-3 font-bold text-indigo-600 text-center whitespace-nowrap align-middle">
                                 Rp {{ number_format($session->total_cost, 0, ',', '.') }}
                             </td>
                             {{-- 🟢 Tombol Edit & Hapus Khusus Admin --}}
@@ -339,6 +351,18 @@
                         <!-- 🟢 Tambahkan id="qrisAmountInput" dan hapus number_format dari value input angka -->
                         <input type="number" id="qrisAmountInput" name="qris_amount" value="{{ $session->qris_amount ?? 0 }}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm">
                     </div>
+                {{-- Pilihan Promo (Opsional) --}}
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">PROMO / VOUCHER (OPSIONAL)</label>
+                    <select name="promotion_id" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">-- Tanpa Promo --</option>
+                        @foreach($promotions as $promo)
+                            <option value="{{ $promo->id }}" {{ $session->promotion_id == $promo->id ? 'selected' : '' }}>
+                                {{ $promo->name }} ({{ $promo->code }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
                 {{-- Kelola Item FnB --}}
                 <div class="mb-4">
                     <div class="flex justify-between items-center mb-1.5">
@@ -352,6 +376,7 @@
                         {{-- Baris item FnB dirender dinamis via JS --}}
                     </div>
                 </div>
+                
 
                 <div class="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
                     <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition">

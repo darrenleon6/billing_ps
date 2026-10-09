@@ -184,6 +184,7 @@
                                         <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Durasi Berjalan</p>
                                         <div class="text-2xl font-bold tracking-wider text-green-400 timer-display"
                                             data-start="{{ \Carbon\Carbon::parse($activeSession->start_time)->toIso8601String() }}"
+                                            data-status="{{ $activeSession->status }}"
                                             data-duration="{{ $activeSession->type === 'package' && $activeSession->package ? $activeSession->package->duration_minutes : '' }}"
                                             data-extended="{{ $activeSession->extended_minutes ?? 0 }}">
                                             00:00:00
@@ -292,6 +293,31 @@
                                         $fnbCost = $activeSession->orders->sum('subtotal');
                                         $grandTotal = $estimatedRentalCost + $fnbCost;
                                     @endphp
+
+                                     <div class="grid grid-cols-2 gap-2 mb-2">
+                                        {{-- Tombol Pindah Unit (Bukan Submit) --}}
+                                        <button type="button" onclick="openTransferModal({{ $activeSession->id }}, '{{ $console->name }}')" 
+                                            class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                                            <span>🔄 Pindah Unit</span>
+                                        </button>
+
+                                        {{-- Form Pause / Resume Tersendiri --}}
+                                        @if($activeSession->status === 'paused')
+                                            <form action="{{ route('rental.resume', $activeSession->id) }}" method="POST" class="w-full m-0">
+                                                @csrf
+                                                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-2 rounded-xl text-xs transition">
+                                                    ▶ Resume
+                                                </button>
+                                            </form>
+                                        @else
+                                            <form action="{{ route('rental.pause', $activeSession->id) }}" method="POST" class="w-full m-0">
+                                                @csrf
+                                                <button type="submit" onclick="return confirm('Pause sesi ini?')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2.5 px-2 rounded-xl text-xs transition">
+                                                    ⏸️ Pause
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
 
                                     {{-- FORM STOP RENTAL --}}
                                     <form action="{{ route('rental.stop', $activeSession->id) }}" method="POST" class="space-y-2 mt-auto">
@@ -427,7 +453,8 @@
                                             }
                                         }</script>
 
-                                        
+                                       
+                                        {{-- 🔒 TOMBOL STOP & STRUK HANYA AKTIF JIKA SHIFT SUDAH DIBUKA --}}
                                         @php
                                             $hasOpenShift = \App\Models\Shift::where('user_id', auth()->id())
                                                 ->where('status', 'open')
@@ -443,20 +470,11 @@
                                             </button>
                                         @else
                                             {{-- Tombol normal jika Shift sudah dibuka --}}
-                                            <div class="mt-4 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
-                                            {{-- 1. Tombol Pindah Konsol --}}
-                                            <button type="button" 
-                                                    onclick="openTransferModal({{ $activeSession->id }}, '{{ $console->name }}')"
-                                                    class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
-                                                🔄 <span>Pindah Unit</span>
-                                            </button>
-
-                                            {{-- 2. Tombol Stop & Struk --}}
+                                            {{-- 1. Tombol Stop & Struk --}}
                                             <button type="submit" onclick="return confirm('Selesaikan sesi rental ini?')" 
                                                     class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
                                                 🛑 <span>Stop & Struk</span>
                                             </button>
-                                        </div>
 
                                         @endif
                                     </form>
@@ -498,6 +516,18 @@ function updateTimers() {
     const timers = document.querySelectorAll('.timer-display');
 
     timers.forEach(timer => {
+        // ⏸️ CEK JIKA STATUS SESI ADALAH PAUSED
+        if (timer.dataset.status === 'paused') {
+            timer.textContent = "PAUSED";
+            timer.className = 'text-2xl font-bold tracking-wider text-yellow-500 animate-pulse timer-display';
+            
+            const extraInfo = timer.nextElementSibling;
+            if (extraInfo) {
+                extraInfo.textContent = '⏸️ Sesi Sedang Dijeda';
+                extraInfo.className = 'text-[10px] text-yellow-400 font-bold mt-1 extra-info';
+            }
+            return; // Lewati perhitungan waktu di bawahnya
+        }
         const startTime = new Date(timer.dataset.start).getTime();
         // Ambil durasi paket dasar
         const baseDuration = timer.dataset.duration ? parseInt(timer.dataset.duration) : null;

@@ -33,6 +33,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/rental-sessions/{id}/transfer', [RentalController::class, 'transferConsole'])->name('rental.transfer');
         Route::post('/rental-sessions/{id}/notes', [RentalController::class, 'updateNotes'])->name('rental.update-notes');
         Route::get('/send-email-report', [ReportController::class, 'sendAutoDailyReport']);  
+        Route::post('/rental/{id}/pause', [RentalController::class, 'pauseSession'])->name('rental.pause');
+        Route::post('/rental/{id}/resume', [RentalController::class, 'resumeSession'])->name('rental.resume');
 
    
     });

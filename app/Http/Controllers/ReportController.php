@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
+use App\Models\Promotion; // Pastikan model Promotion ada
+use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
@@ -61,6 +63,8 @@ class ReportController extends Controller
 
         $cash_amount = $sessions->sum('cash_amount');
         $qris_amount = $sessions->sum('qris_amount');
+         // 🟢 Ambil daftar promo yang aktif untuk dikirim ke view modal edit
+        $promotions = Promotion::where('is_active', true)->orderBy('name', 'asc')->get();
 
 
 
@@ -97,6 +101,7 @@ class ReportController extends Controller
             'grandTotal',
             'startDate',
             'endDate',
+            'promotions',
             'cash_amount',
             'qris_amount',
             'errorMessage',
@@ -116,7 +121,8 @@ class ReportController extends Controller
         }
 
         $session = RentalSession::with(['console', 'orders.product'])->findOrFail($id);
-        return view('reports.edit-transaction', compact('session'));
+
+        return view('reports.edit-transaction', compact('session', 'promotions'));
     }
 
     // 2. Simpan Perubahan Transaksi
@@ -127,6 +133,7 @@ class ReportController extends Controller
         }
 
         $session = RentalSession::findOrFail($id);
+        
 
         $request->validate([
             'rental_cost' => 'required|numeric|min:0',
@@ -135,78 +142,103 @@ class ReportController extends Controller
             'payment_method' => 'required|string', // Validasi metode pembayaran
             'products' => 'nullable|array', // ID produk yang dipilih
             'quantities' => 'nullable|array', // Jumlah masing-masing produk
+            'promotion_id'   => 'nullable|exists:promotions,id', // 🟢 TAMBAHAN VALIDASI PROMO
         ]);
 
-        // 1. Update biaya sewa PS
-        $session->rental_cost = $request->rental_cost;
         
-        $session->payment_method = $request->payment_method;
 
-        // 2. Hapus order FnB lama untuk session ini, lalu hitung ulang
-        $session->orders()->delete();
+       // 🟢 TAMBAHAN BARU: Bungkus dengan DB::transaction agar proses stok aman konsisten
+        DB::transaction(function () use ($request, $session) {
+            
+            // 🟢 TAMBAHAN BARU: 1. Kembalikan stok dari order lama yang akan dihapus
+            foreach ($session->orders as $oldOrder) {
+                if ($oldOrder->product) {
+                    $oldOrder->product->increment('stock', $oldOrder->quantity);
+                }
+            }
 
-        $fnbCost = 0;
-        if ($request->has('products')) {
-            foreach ($request->products as $index => $productId) {
-                $qty = $request->quantities[$index] ?? 0;
-                if ($qty > 0 && !empty($productId)) {
-                    $product = Product::find($productId);
-                    if ($product) {
-                        $subtotal = $product->price * $qty;
-                        $fnbCost += $subtotal;
+            // 2. Hapus order FnB lama untuk session ini, lalu hitung ulang
+            $session->orders()->delete();
 
-                        // Buat / masukkan order baru
-                        Order::create([
-                            'rental_session_id' => $session->id,
-                            'product_id' => $product->id,
-                            'quantity' => $qty,
-                            'price' => $product->price,
-                            'subtotal' => $subtotal,
-                        ]);
+            $fnbCost = 0;
+            if ($request->has('products')) {
+                foreach ($request->products as $index => $productId) {
+                    $qty = (int) ($request->quantities[$index] ?? 0);
+                    if ($qty > 0 && !empty($productId)) {
+                        $product = Product::find($productId);
+                        if ($product) {
+                            
+                            // 🟢 TAMBAHAN BARU: Cek kecukupan stok sebelum dikurangi
+                            if ($product->stock < $qty) {
+                                throw new \Exception("Stok produk {$product->name} tidak mencukupi! Sisa stok: {$product->stock}");
+                            }
+
+                            // 🟢 TAMBAHAN BARU: Kurangi stok produk sejumlah quantity baru yang diinput
+                            $product->decrement('stock', $qty);
+
+                            $subtotal = $product->price * $qty;
+                            $fnbCost += $subtotal;
+
+                            // Buat / masukkan order baru
+                            Order::create([
+                                'rental_session_id' => $session->id,
+                                'product_id'        => $product->id,
+                                'quantity'          => $qty,
+                                'price'             => $product->price,
+                                'subtotal'          => $subtotal,
+                            ]);
+                        }
                     }
                 }
             }
-        }
 
-        // 3. Simpan fnb_cost dan hitung grand total baru
-        // 4. Simpan biaya FnB baru
-        $session->fnb_cost = $fnbCost;
+            // 1. Update biaya sewa PS
+            $session->rental_cost = $request->rental_cost;
 
-        // 5. Hitung Subtotal sebelum diskon (Sewa PS + FnB)
-        $subtotalBeforeDiscount = $session->rental_cost + $session->fnb_cost;
-        
-        $discountAmount = 0;
+            $session->payment_method = $request->payment_method;
 
-        // Cek jenis promo yang terikat pada transaksi ini
-        if ($session->promotion) {
-            // Asumsi struktur tabel promotions memiliki kolom 'type' (misal: 'percentage' atau 'fixed') 
-            // dan kolom 'value' (isi angka persentase atau nominal potongannya)
-            if ($session->promotion->type === 'percentage') {
-                // Jika promo persentase (misal: 10 berarti 10%)
-                $percentage = $session->promotion->value ?? 0;
-                $discountAmount = ($subtotalBeforeDiscount * $percentage) / 100;
+            // 4. Simpan biaya FnB baru
+            $session->fnb_cost = $fnbCost;
+
+            // 🟢 TAMBAHAN BARU: Simpan promotion_id yang dipilih dari modal edit
+            $session->promotion_id = $request->promotion_id;
+
+            // 5. Hitung Subtotal sebelum diskon (Sewa PS + FnB)
+            $subtotalBeforeDiscount = $session->rental_cost + $session->fnb_cost;
+
+            $discountAmount = 0;
+
+            // Cek jenis promo yang terikat pada transaksi ini
+            if ($session->promotion) {
+                // Asumsi struktur tabel promotions memiliki kolom 'type' (misal: 'percentage' atau 'fixed')
+                // dan kolom 'value' (isi angka persentase atau nominal potongannya)
+                if ($session->promotion->type === 'percentage') {
+                    // Jika promo persentase (misal: 10 berarti 10%)
+                    $percentage = $session->promotion->value ?? 0;
+                    $discountAmount = ($subtotalBeforeDiscount * $percentage) / 100;
+                } else {
+                    // Jika promo nominal tetap (fixed)
+                    $discountAmount = $session->promotion->value ?? ($session->discount_amount ?? 0);
+                }
             } else {
-                // Jika promo nominal tetap (fixed)
-                $discountAmount = $session->promotion->value ?? ($session->discount_amount ?? 0);
+                // Fallback jika tidak ada relasi promotion, pakai kolom discount_amount yang tersimpan
+                $discountAmount = $session->discount_amount ?? 0;
             }
-        } else {
-            // Fallback jika tidak ada relasi promotion, pakai kolom discount_amount yang tersimpan
-            $discountAmount = $session->discount_amount ?? 0;
-        }
 
-        // Simpan nilai diskon yang berlaku ke database
-        $session->discount_amount = $discountAmount;
+            // Simpan nilai diskon yang berlaku ke database
+            $session->discount_amount = $discountAmount;
 
-        // 6. Hitung Grand Total setelah dikurangi diskon
-        $session->total_cost = max(0, $subtotalBeforeDiscount - $discountAmount);
+            // 6. Hitung Grand Total setelah dikurangi diskon
+            $session->total_cost = max(0, $subtotalBeforeDiscount - $discountAmount);
 
-        // 7. Simpan nominal cash dan qris dari inputan form edit modal
-        $session->cash_amount = $request->cash_amount ?? 0;
-        $session->qris_amount = $request->qris_amount ?? 0;
+            // 7. Simpan nominal cash dan qris dari inputan form edit modal
+            $session->cash_amount = $request->cash_amount ?? 0;
+            $session->qris_amount = $request->qris_amount ?? 0;
 
-        $session->save();
+            $session->save();
+        });
 
-        return redirect()->back()->with('success', 'Transaksi berhasil diperbarui!');
+        return redirect()->back()->with('success', 'Transaksi berhasil diperbarui dan stok berhasil disesuaikan!');
     }
 
     // 3. Hapus Transaksi
