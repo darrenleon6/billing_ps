@@ -19,4 +19,9 @@ class Package extends Model
     {
         return $this->hasMany(RentalSession::class);
     }
+        // Tambahkan relasi ini di dalam class Package
+    public function items()
+    {
+        return $this->hasMany(PackageItem::class);
+    }
 }

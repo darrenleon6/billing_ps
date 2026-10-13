@@ -177,8 +177,20 @@
                             <td class="p-3 text-gray-600 text-center">
                                 {{ \Carbon\Carbon::parse($session->end_time)->format('d M Y, H:i') }}
                             </td>
-                            <td class="p-3 font-bold text-gray-800 whitespace-nowrap align-middle">
-                                {{ $session->console->name ?? 'Console' }}
+                            <td class="p-3 text-gray-700 align-middle">
+                                {{-- Nama Unit PS --}}
+                                <div class="font-bold text-gray-900">{{ $session->console->name ?? '-' }}</div>
+                                
+                                {{-- Badge Paket (Teks panjang akan turun ke baris bawah dengan rapi tanpa terpotong) --}}
+                                @if($session->package)
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 mt-1">
+                                        📦 <span>{{ $session->package->name }}</span>
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-gray-50 text-gray-600 border border-gray-200 mt-1">
+                                        ⏱️ Bebas / Non-Paket
+                                    </span>
+                                @endif
                             </td>
                             {{-- Kolom Jam Mulai & Selesai (BARU) --}}
                             <td class="p-3.5 px-4 font-mono font-semibold text-gray-900 text-center whitespace-nowrap align-middle">

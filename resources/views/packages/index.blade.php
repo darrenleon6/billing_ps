@@ -97,14 +97,14 @@
 
     {{-- MODAL TAMBAH PAKET --}}
     <div id="createPackageModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative max-h-[90vh] overflow-y-auto">
             <h3 class="text-base font-bold text-gray-800 mb-4">Tambah Paket Rental Baru</h3>
             
             <form action="{{ route('packages.store') }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">Nama Paket</label>
-                    <input type="text" name="name" placeholder="Misal: Paket Hemat 2 Jam" required class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" name="name" placeholder="Misal: Paket Hemat 2 Jam + Es Teh" required class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500">
                 </div>
                 
                 <div class="grid grid-cols-2 gap-3">
@@ -115,6 +115,20 @@
                     <div>
                         <label class="block text-xs font-bold text-gray-700 mb-1">Harga Paket (Rp)</label>
                         <input type="number" name="price" placeholder="18000" required class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                {{-- 🟢 TAMBAHAN BARU: Bundling Item FnB (Opsional) --}}
+                <div class="border-t border-gray-100 pt-3">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="block text-xs font-bold text-gray-700 uppercase">Bundling Item FnB (Opsional)</label>
+                        <button type="button" onclick="addPackageFnbRow()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                            + Tambah Item
+                        </button>
+                    </div>
+                    
+                    <div id="packageFnbListContainer" class="space-y-2">
+                        {{-- Baris item FnB ditambahkan via JavaScript --}}
                     </div>
                 </div>
 
@@ -132,7 +146,7 @@
 
     {{-- MODAL EDIT PAKET --}}
     <div id="editPackageModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative max-h-[90vh] overflow-y-auto">
             <h3 class="text-base font-bold text-gray-800 mb-4">Edit Paket Rental</h3>
             
             <form id="editPackageForm" method="POST" action="" class="space-y-4">
@@ -152,6 +166,20 @@
                     <div>
                         <label class="block text-xs font-bold text-gray-700 mb-1">Harga Paket (Rp)</label>
                         <input type="number" id="editPrice" name="price" required class="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                {{-- 🟢 TAMBAHAN BARU: Bundling Item FnB untuk Edit --}}
+                <div class="border-t border-gray-100 pt-3">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="block text-xs font-bold text-gray-700 uppercase">Bundling Item FnB (Opsional)</label>
+                        <button type="button" onclick="addEditPackageFnbRow()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                            + Tambah Item
+                        </button>
+                    </div>
+                    
+                    <div id="editPackageFnbListContainer" class="space-y-2">
+                        {{-- Baris item FnB akan diisi otomatis via JS saat edit diklik --}}
                     </div>
                 </div>
 
@@ -181,6 +209,83 @@
             document.getElementById('editName').value = packageData.name;
             document.getElementById('editDurationMinutes').value = packageData.duration_minutes;
             document.getElementById('editPrice').value = packageData.price;
+            document.getElementById('editPackageModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editPackageModal').classList.add('hidden');
+        }
+
+        // 🟢 Deklarasikan availableProducts cukup 1 kali di paling atas script
+        const availableProducts = @json($products ?? []);
+
+        // Fungsi untuk Modal Tambah
+        function addPackageFnbRow(productId = '', quantity = 1) {
+            const container = document.getElementById('packageFnbListContainer');
+            
+            let optionsHtml = '<option value="">-- Pilih Produk FnB --</option>';
+            availableProducts.forEach(prod => {
+                let selected = (prod.id == productId) ? 'selected' : '';
+                optionsHtml += `<option value="${prod.id}" ${selected}>${prod.name} (Stok: ${prod.stock} - Rp ${Number(prod.price).toLocaleString('id-ID')})</option>`;
+            });
+
+            const rowId = 'fnb_row_' + Date.now() + Math.random();
+            const rowHtml = `
+                <div id="${rowId}" class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200">
+                    <select name="products[]" class="w-full text-xs border border-gray-300 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                        ${optionsHtml}
+                    </select>
+                    <input type="number" name="quantities[]" value="${quantity}" min="1" class="w-16 text-xs border border-gray-300 rounded-lg p-2 text-center" placeholder="Qty" required>
+                    <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-sm">
+                        &times;
+                    </button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', rowHtml);
+        }
+
+        // Fungsi untuk Modal Edit Baris FnB
+        function addEditPackageFnbRow(productId = '', quantity = 1) {
+            const container = document.getElementById('editPackageFnbListContainer');
+            
+            let optionsHtml = '<option value="">-- Pilih Produk FnB --</option>';
+            availableProducts.forEach(prod => {
+                let selected = (prod.id == productId) ? 'selected' : '';
+                optionsHtml += `<option value="${prod.id}" ${selected}>${prod.name} (Stok: ${prod.stock} - Rp ${Number(prod.price).toLocaleString('id-ID')})</option>`;
+            });
+
+            const rowId = 'edit_fnb_row_' + Date.now() + Math.random();
+            const rowHtml = `
+                <div id="${rowId}" class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200">
+                    <select name="products[]" class="w-full text-xs border border-gray-300 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                        ${optionsHtml}
+                    </select>
+                    <input type="number" name="quantities[]" value="${quantity}" min="1" class="w-16 text-xs border border-gray-300 rounded-lg p-2 text-center" placeholder="Qty" required>
+                    <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-sm">
+                        &times;
+                    </button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', rowHtml);
+        }
+
+        // 🟢 Pastikan openEditModal didefinisikan secara global agar terbaca oleh tombol di tabel
+        function openEditModal(package) {
+            document.getElementById('editPackageForm').action = `/packages/${package.id}`;
+            
+            document.getElementById('editName').value = package.name;
+            document.getElementById('editDurationMinutes').value = package.duration_minutes;
+            document.getElementById('editPrice').value = package.price;
+            
+            const container = document.getElementById('editPackageFnbListContainer');
+            container.innerHTML = '';
+            
+            if (package.items && package.items.length > 0) {
+                package.items.forEach(item => {
+                    addEditPackageFnbRow(item.product_id, item.quantity);
+                });
+            }
+            
             document.getElementById('editPackageModal').classList.remove('hidden');
         }
 

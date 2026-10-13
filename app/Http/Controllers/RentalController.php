@@ -54,7 +54,7 @@ class RentalController extends Controller
         ));
     }
 
-    public function startSession(Request $request)
+   public function startSession(Request $request)
     {
         // 🟢 1. Cek apakah ada shift yang sedang AKTIF untuk user/kasir yang login
         $activeShift = Shift::where('user_id', Auth::id())
@@ -85,17 +85,18 @@ class RentalController extends Controller
         // 🟢 3. Logika Pengecekan & Pengaplikasian Promo Bonus Waktu
         $bonusMinutes = 0;
         $appliedPromoId = null;
+        $package = null;
+
+        // Ambil data paket terlebih dahulu jika tipe package untuk validasi promo & bundling FnB
+        if ($request->type === 'package' && $request->filled('package_id')) {
+            $package = \App\Models\Package::with('items.product')->find($request->package_id);
+        }
 
         if ($request->filled('promotion_id')) {
             $promo = \App\Models\Promotion::find($request->promotion_id);
 
             if ($promo && $promo->is_active && $promo->type === 'bonus_time') {
-                // Hitung durasi dasar (jika memilih paket)
-                $baseDuration = 0;
-                if ($request->type === 'package' && $request->filled('package_id')) {
-                    $package = \App\Models\Package::find($request->package_id);
-                    $baseDuration = $package ? $package->duration_minutes : 0;
-                }
+                $baseDuration = $package ? $package->duration_minutes : 0;
 
                 // Validasi Syarat Minimal Durasi Sewa Promo
                 if ($promo->min_duration_minutes > 0 && $baseDuration < $promo->min_duration_minutes) {
@@ -112,21 +113,54 @@ class RentalController extends Controller
                 $appliedPromoId = $promo->id;
             }
         }
-        $console = Console::findOrFail($request->console_id);
-        $console->update(['status' => 'active']);
-        // 🟢 4. Simpan Sesi Rental Baru
-        RentalSession::create([
-            'console_id'       => $request->console_id,
-            'user_id'          => Auth::id(),        // Catat kasir yang melayani
-            'shift_id'         => $activeShift->id,  // Kaitkan ke Shift Aktif
-            'package_id'       => $request->type === 'package' ? $request->package_id : null,
-            'promotion_id'     => $appliedPromoId,   // 👈 Simpan ID promo bonus waktu jika ada
-            'extended_minutes' => $bonusMinutes,     // 👈 Masukkan bonus menit langsung ke extended_minutes agar timer otomatis bertambah
-            'type'             => $request->type,
-            'start_time'       => Carbon::now(),
-            'status'           => 'active',
-            'notes'            => $request->input('notes'),
-        ]);
+
+        // 🟢 4. Gunakan DB::transaction untuk memastikan stok FnB dan pembuatan sesi aman secara konsisten
+            DB::transaction(function () use ($request, $activeShift, $bonusMinutes, $appliedPromoId, $package) {
+            
+            $console = Console::findOrFail($request->console_id);
+            $console->update(['status' => 'active']);
+
+            // Buat Sesi Rental Baru
+            $session = RentalSession::create([
+                'console_id'       => $request->console_id,
+                'user_id'          => Auth::id(),        // Catat kasir yang melayani
+                'shift_id'         => $activeShift->id,  // Kaitkan ke Shift Aktif
+                'package_id'       => $request->type === 'package' ? $request->package_id : null,
+                'promotion_id'     => $appliedPromoId,   // Simpan ID promo bonus waktu jika ada
+                'extended_minutes' => $bonusMinutes,     // Masukkan bonus menit langsung ke extended_minutes
+                'type'             => $request->type,
+                'start_time'       => Carbon::now(),
+                'status'           => 'active',
+                'notes'            => $request->input('notes'),
+            ]);
+
+            // 🟢 5. Jika memilih paket dan paket tersebut memiliki item bundling FnB, proses otomatis
+            if ($package && $package->items && $package->items->count() > 0) {
+                foreach ($package->items as $item) {
+                    $product = $item->product;
+                    $qty = $item->quantity;
+
+                    if ($product) {
+                        // Validasi stok produk cukup
+                        if ($product->stock < $qty) {
+                            throw new \Exception("Stok produk bundling '{$product->name}' tidak mencukupi! Sisa stok: {$product->stock}");
+                        }
+
+                        // Kurangi stok produk FnB
+                        $product->decrement('stock', $qty);
+
+                        // Catat ke tabel orders transaksi
+                        \App\Models\Order::create([
+                            'rental_session_id' => $session->id,
+                            'product_id'        => $product->id,
+                            'quantity'          => $qty,
+                            'price'             => $product->price,
+                            'subtotal'          => 0, // Dibuat 0 karena harga sudah tercakup dalam harga paket utama
+                        ]);
+                    }
+                }
+            }
+        });
 
         $successMessage = 'Sesi rental berhasil dimulai!';
         if ($bonusMinutes > 0) {
